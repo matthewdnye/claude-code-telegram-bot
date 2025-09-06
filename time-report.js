@@ -1,17 +1,18 @@
 #!/usr/bin/env node
 
 /**
- * ActivityWatch Time Report Generator for it-fit project
+ * ActivityWatch Time Report Generator
  * Usage: node time-report.js [days] [project]
  */
 
 const axios = require('axios');
 const fs = require('fs');
+const config = require('./config.json');
 
 const ACTIVITY_WATCH_URL = 'http://localhost:5600/api/0';
 const BUCKET_ID = 'claude-bot-sessions';
 
-async function getTimeReport(days = 7, project = 'it-fit') {
+async function getTimeReport(days = 7, project = config.activityWatch.defaultProject) {
     try {
         console.log(`\n📊 Time Report for ${project} project (last ${days} days)\n`);
 
@@ -113,6 +114,6 @@ async function getTimeReport(days = 7, project = 'it-fit') {
 
 // Parse command line arguments
 const days = parseInt(process.argv[2]) || 7;
-const project = process.argv[3] || 'it-fit';
+const project = process.argv[3] || config.activityWatch.defaultProject;
 
 getTimeReport(days, project);

@@ -1,5 +1,7 @@
 const ClaudeStreamProcessor = require('./claude-stream-processor');
 const ActivityWatchIntegration = require('./ActivityWatchIntegration');
+const ClaudeCodeTokenCounter = require('./ClaudeCodeTokenCounter');
+const TelegramMCPIntegration = require('./TelegramMCPIntegration');
 
 /**
  * Session Manager - Extracted from StreamTelegramBot
@@ -15,12 +17,22 @@ class SessionManager {
     this.mainBot = mainBot; // Reference to main bot instance for safeSendMessage
     this.configFilePath = options.configFilePath;
     
+    // Telegram MCP integration for file sending
+    this.telegramMCPIntegration = null;
+    if (mainBot && mainBot.botInstanceName && mainBot.bot && mainBot.bot.token) {
+      console.log('[SessionManager] Initializing Telegram MCP integration for bot:', mainBot.botInstanceName);
+      // We'll initialize this per-session with specific chat ID
+    }
+    
     // Session storage
     this.userSessions = new Map(); // userId -> { processor, sessionId, lastTodoMessageId, etc }
     this.sessionStorage = new Map(); // userId -> { currentSessionId, sessionHistory: [] }
     
     // Token tracking across session chains
     this.cumulativeTokenCache = new Map(); // sessionId -> { totalInputTokens, totalOutputTokens, cacheReadTokens, cacheCreationTokens, transactionCount }
+    
+    // Message queuing for active sessions
+    this.messageQueues = new Map(); // userId -> [{ message: string, chatId: string, timestamp: number }]
     
     // Title tracking for auto-pin functionality
     this.sessionTitles = new Map(); // userId -> { lastTitle, chatId }
@@ -30,6 +42,9 @@ class SessionManager {
       enabled: this.mainBot.configManager.getActivityWatchEnabled(),
       timeMultiplier: this.mainBot.configManager.getActivityWatchTimeMultiplier()
     });
+    
+    // Claude Code accurate token counter
+    this.tokenCounter = new ClaudeCodeTokenCounter();
     
     // Initialize ActivityWatch bucket asynchronously (don't block constructor)
     this.initializeActivityWatch();
@@ -48,6 +63,55 @@ class SessionManager {
   }
 
   /**
+   * Initialize static token cache for accurate Claude Code token counting
+   */
+  async initializeStaticTokenCache(sessionId) {
+    try {
+      console.log(`[SessionManager] Initializing static token cache for session ${sessionId.slice(-8)}`);
+      await this.tokenCounter.refreshStaticTokenCache(this.options.workingDirectory);
+      console.log('[SessionManager] Static token cache initialized successfully');
+    } catch (error) {
+      console.error('[SessionManager] Static token cache initialization failed:', error.message);
+      // Continue with fallback values - the tokenCounter handles this gracefully
+    }
+  }
+
+  /**
+   * Get accurate token breakdown using Claude Code compatible counting
+   */
+  async getAccurateTokenBreakdown(sessionId) {
+    try {
+      // Get sessions directory for this session's JSONL file
+      const os = require('os');
+      const path = require('path');
+      const claudeSessionsDir = path.join(os.homedir(), '.claude', 'sessions');
+      
+      // Get accurate breakdown from token counter
+      const breakdown = await this.tokenCounter.getAccurateTokenBreakdown(sessionId, claudeSessionsDir);
+      
+      return breakdown;
+    } catch (error) {
+      console.error('[SessionManager] Error getting accurate token breakdown:', error);
+      
+      // Fallback to current system
+      const contextLimit = this.getContextWindowLimit(this.options.model);
+      return {
+        grandTotal: 0,
+        contextLimit,
+        usagePercentage: '0.0',
+        freeSpace: contextLimit,
+        systemPrompt: 0,
+        systemTools: 0,
+        mcpTools: 0,
+        customAgents: 0,
+        memoryFiles: 0,
+        conversation: 0,
+        conversationDetails: { inputTokens: 0, outputTokens: 0, totalTokens: 0 }
+      };
+    }
+  }
+
+  /**
    * Create new user session with Claude processor
    */
   async createUserSession(userId, chatId) {
@@ -61,6 +125,32 @@ class SessionManager {
       model: userModel,
       workingDirectory: this.options.workingDirectory
     });
+
+    // Initialize Telegram MCP integration for file sending
+    let telegramMCPIntegration = null;
+    if (this.mainBot && this.mainBot.botInstanceName && this.mainBot.bot && this.mainBot.bot.token) {
+      try {
+        telegramMCPIntegration = new TelegramMCPIntegration(
+          this.mainBot.botInstanceName,
+          this.mainBot.bot.token,
+          chatId.toString()
+        );
+        
+        // Create MCP config file for this bot instance
+        const mcpConfigPath = await telegramMCPIntegration.createMCPConfig();
+        
+        // Pass session-compatible Claude Code arguments to processor
+        // Note: We use session-compatible args to avoid conflicts with --continue/--resume
+        const additionalArgs = telegramMCPIntegration.getSessionCompatibleArgs();
+        processor.setAdditionalArgs(additionalArgs);
+        
+        console.log(`[User ${userId}] Telegram MCP integration initialized for ${this.mainBot.botInstanceName}`);
+        console.log(`[User ${userId}] MCP config: ${mcpConfigPath}`);
+      } catch (error) {
+        console.error(`[User ${userId}] Failed to initialize Telegram MCP integration:`, error.message);
+        // Continue without MCP integration
+      }
+    }
 
     // Get stored session ID to check if this is a continuation
     const storedSessionId = this.getStoredSessionId(userId);
@@ -90,6 +180,7 @@ class SessionManager {
       userId,
       chatId,
       processor,
+      telegramMCPIntegration, // Add MCP integration to session
       messageCount: 0,
       lastTodoMessageId: null,
       lastTodos: null,
@@ -140,6 +231,9 @@ class SessionManager {
       
       // IMPORTANT: Save session to config file immediately for persistence across bot restarts
       await this.saveCurrentSessionToConfig(userId, data.sessionId);
+      
+      // Initialize static token cache for accurate token counting (async, don't block)
+      this.initializeStaticTokenCache(data.sessionId);
       
       // Enhance data with additional information for better session display
       const enhancedData = {
@@ -253,9 +347,11 @@ class SessionManager {
       // Stop typing indicator when Claude finishes
       await this.activityIndicator.stop(chatId);
 
-      // Clean up temp file if exists
+      // Clean up temp files if they exist
       const ImageHandler = require('./ImageHandler');
+      const FileHandler = require('./FileHandler');
       ImageHandler.cleanupTempFile(session, userId);
+      FileHandler.cleanupTempFiles(session, userId);
 
       // Add duration to the data for formatting
       const dataWithDuration = {
@@ -300,6 +396,9 @@ class SessionManager {
           await this.checkAndHandleTitleChange(userId, chatId, currentTitle);
         }
       }
+
+      // Process any queued messages after session completion
+      await this.processMessageQueue(userId);
     });
 
     // Keep the legacy 'complete' event for backward compatibility (but without usage updates)
@@ -310,9 +409,11 @@ class SessionManager {
       this.updateSessionActivity(session);
       await this.activityIndicator.stop(chatId);
 
-      // Clean up temp file if exists
+      // Clean up temp files if they exist
       const ImageHandler = require('./ImageHandler');
+      const FileHandler = require('./FileHandler');
       ImageHandler.cleanupTempFile(session, userId);
+      FileHandler.cleanupTempFiles(session, userId);
       
       // Check for title changes after Claude completes processing
       const sessionId = session.sessionId || session.processor.getCurrentSessionId();
@@ -337,9 +438,11 @@ class SessionManager {
       // Stop typing indicator on error
       await this.activityIndicator.stop(chatId);
 
-      // Clean up temp file if exists
+      // Clean up temp files if they exist
       const ImageHandler = require('./ImageHandler');
+      const FileHandler = require('./FileHandler');
       ImageHandler.cleanupTempFile(session, userId);
+      FileHandler.cleanupTempFiles(session, userId);
 
       await this.sendError(chatId, error);
     });
@@ -626,6 +729,13 @@ class SessionManager {
         this.addSessionToHistory(userId, session.sessionId);
       }
       
+      // Cleanup Telegram MCP integration
+      if (session.telegramMCPIntegration) {
+        session.telegramMCPIntegration.cleanupMCPConfig().catch(error => {
+          console.error(`[User ${userId}] Error cleaning up MCP config:`, error.message);
+        });
+      }
+      
       // Remove from active processors
       if (session.processor) {
         this.activeProcessors.delete(session.processor);
@@ -692,8 +802,148 @@ class SessionManager {
       
       session.processor.cancel();
       await this.mainBot.safeSendMessage(chatId, '❌ **Session cancelled**');
+      
+      // Process any queued messages after cancellation
+      await this.processMessageQueue(userId);
     } else {
       await this.mainBot.safeSendMessage(chatId, '⚠️ **No active session to cancel**');
+    }
+  }
+
+  /**
+   * Queue a message for processing after current session ends
+   */
+  queueMessage(userId, chatId, message) {
+    if (!this.messageQueues.has(userId)) {
+      this.messageQueues.set(userId, []);
+    }
+    
+    const queue = this.messageQueues.get(userId);
+    queue.push({
+      message: message,
+      chatId: chatId,
+      timestamp: Date.now()
+    });
+    
+    console.log(`[User ${userId}] Message queued: "${message.substring(0, 50)}..."`);
+    console.log(`[User ${userId}] Queue length: ${queue.length}`);
+  }
+
+  /**
+   * Process all queued messages for a user
+   */
+  async processMessageQueue(userId) {
+    const queue = this.messageQueues.get(userId);
+    if (!queue || queue.length === 0) {
+      return;
+    }
+
+    console.log(`[User ${userId}] Processing message queue with ${queue.length} messages`);
+
+    // Process the first (oldest) message in the queue
+    const queuedMessage = queue.shift();
+    
+    // If queue is now empty, remove it
+    if (queue.length === 0) {
+      this.messageQueues.delete(userId);
+    }
+
+    console.log(`[User ${userId}] Processing queued message: "${queuedMessage.message.substring(0, 50)}..."`);
+    
+    // Send the queued message to the bot's message processor
+    // This will trigger a new Claude Code session
+    try {
+      await this.mainBot.processUserMessage({
+        chat: { id: queuedMessage.chatId },
+        from: { id: userId },
+        text: queuedMessage.message
+      });
+    } catch (error) {
+      console.error(`[User ${userId}] Error processing queued message:`, error);
+      await this.mainBot.safeSendMessage(queuedMessage.chatId, 
+        '❌ **Error processing queued message**\n\n' +
+        `Message: "${queuedMessage.message.substring(0, 100)}..."`
+      );
+    }
+  }
+
+  /**
+   * Show detailed context breakdown similar to Claude Code /context
+   */
+  async showContextBreakdown(chatId) {
+    const userId = this.mainBot.getUserIdFromChat(chatId);
+    const session = this.getUserSession(userId);
+    let storedSessionId = this.getStoredSessionId(userId);
+    
+    // If no stored session from config file, check sessionStorage
+    if (!storedSessionId) {
+      const sessionStorage = this.sessionStorage.get(userId);
+      if (sessionStorage && sessionStorage.currentSessionId) {
+        storedSessionId = sessionStorage.currentSessionId;
+      }
+    }
+    
+    const sessionId = session?.sessionId || storedSessionId;
+    
+    if (!sessionId) {
+      await this.mainBot.safeSendMessage(chatId, 
+        '❌ **No Active Session**\n\n' +
+        'No session found. Start a new session with /new to see context breakdown.'
+      );
+      return;
+    }
+    
+    try {
+      // Get accurate token breakdown
+      const breakdown = await this.getAccurateTokenBreakdown(sessionId);
+      
+      // Format output similar to Claude Code /context
+      let text = `**Context Usage**\n`;
+      text += `**${this.options.model}** • **${Math.round(breakdown.grandTotal/1000)}k/${Math.round(breakdown.contextLimit/1000)}k tokens (${breakdown.usagePercentage}%)**\n\n`;
+      
+      // Component breakdown
+      text += `⛁ **System prompt:** ${(breakdown.systemPrompt/1000).toFixed(1)}k tokens (${(breakdown.systemPrompt/breakdown.contextLimit*100).toFixed(1)}%)\n`;
+      text += `⛁ **System tools:** ${(breakdown.systemTools/1000).toFixed(1)}k tokens (${(breakdown.systemTools/breakdown.contextLimit*100).toFixed(1)}%)\n`;
+      text += `⛁ **MCP tools:** ${(breakdown.mcpTools/1000).toFixed(1)}k tokens (${(breakdown.mcpTools/breakdown.contextLimit*100).toFixed(1)}%)\n`;
+      text += `⛁ **Custom agents:** ${(breakdown.customAgents/1000).toFixed(1)}k tokens (${(breakdown.customAgents/breakdown.contextLimit*100).toFixed(1)}%)\n`;
+      text += `⛁ **Memory files:** ${(breakdown.memoryFiles/1000).toFixed(1)}k tokens (${(breakdown.memoryFiles/breakdown.contextLimit*100).toFixed(1)}%)\n`;
+      
+      if (breakdown.conversation > 0) {
+        text += `⛁ **Conversation:** ${(breakdown.conversation/1000).toFixed(1)}k tokens (${(breakdown.conversation/breakdown.contextLimit*100).toFixed(1)}%)\n`;
+        text += `   ↳ ${breakdown.conversationDetails.inputTokens} input, ${breakdown.conversationDetails.outputTokens} output\n`;
+      }
+      
+      text += `⛶ **Free space:** ${(breakdown.freeSpace/1000).toFixed(1)}k (${(breakdown.freeSpace/breakdown.contextLimit*100).toFixed(1)}%)\n\n`;
+      
+      if (breakdown.breakdown && breakdown.breakdown.mcpTools && breakdown.breakdown.mcpTools.length > 0) {
+        text += `**MCP Tools:**\n`;
+        for (const tool of breakdown.breakdown.mcpTools.slice(0, 5)) { // Show first 5
+          text += `└ ${tool.name}: ${tool.tokens} tokens\n`;
+        }
+        if (breakdown.breakdown.mcpTools.length > 5) {
+          text += `└ ... and ${breakdown.breakdown.mcpTools.length - 5} more\n`;
+        }
+        text += '\n';
+      }
+      
+      if (breakdown.breakdown && breakdown.breakdown.customAgents && breakdown.breakdown.customAgents.length > 0) {
+        text += `**Custom Agents:**\n`;
+        for (const agent of breakdown.breakdown.customAgents.slice(0, 5)) { // Show first 5
+          text += `└ ${agent.name}: ${agent.tokens} tokens\n`;
+        }
+        if (breakdown.breakdown.customAgents.length > 5) {
+          text += `└ ... and ${breakdown.breakdown.customAgents.length - 5} more\n`;
+        }
+      }
+      
+      await this.mainBot.safeSendMessage(chatId, text);
+      
+    } catch (error) {
+      console.error('[SessionManager] Error showing context breakdown:', error);
+      await this.mainBot.safeSendMessage(chatId,
+        '❌ **Context Breakdown Error**\n\n' +
+        'Unable to calculate accurate context breakdown. The token counting system may need initialization.'
+      );
     }
   }
 
@@ -759,69 +1009,41 @@ class SessionManager {
       text += `📋 **Stored:** \`${storedSessionId ? storedSessionId.slice(-8) : 'None'}\`\n`;
       text += `📊 **Status:** ${isActive ? '🔄 Processing' : '💤 Idle'}\n`;
       text += `💬 **Messages:** ${messageCount}\n`;
+      
+      // Show queue status if there are queued messages
+      const queue = this.messageQueues.get(userId);
+      if (queue && queue.length > 0) {
+        text += `📥 **Queued:** ${queue.length} message${queue.length === 1 ? '' : 's'}\n`;
+      }
+      
       text += `⏱ **Uptime:** ${uptime}s\n\n`;
       
-      // Token usage information with context window ratio - including cumulative from all parent sessions
-      const currentTokens = session.tokenUsage;
-      const contextLimit = this.getContextWindowLimit(this.options.model);
+      // Accurate token usage information matching Claude Code /context display
+      const breakdown = await this.getAccurateTokenBreakdown(sessionId);
       
-      // Get cumulative tokens from session chain (if continuation) or use current session tokens
-      let displayTokens = currentTokens;
-      if (session.isContinuation && storedSessionId) {
-        // Get cumulative tokens from cache (should be available from session creation)
-        const cumulativeTokens = this.cumulativeTokenCache.get(storedSessionId);
-        if (cumulativeTokens) {
-          // Combine cumulative parent tokens with current session tokens
-          displayTokens = {
-            totalInputTokens: cumulativeTokens.totalInputTokens + currentTokens.totalInputTokens,
-            totalOutputTokens: cumulativeTokens.totalOutputTokens + currentTokens.totalOutputTokens,
-            totalTokens: cumulativeTokens.totalTokens + currentTokens.totalTokens,
-            transactionCount: cumulativeTokens.transactionCount + currentTokens.transactionCount,
-            cacheReadTokens: cumulativeTokens.cacheReadTokens + currentTokens.cacheReadTokens,
-            cacheCreationTokens: cumulativeTokens.cacheCreationTokens + currentTokens.cacheCreationTokens
-          };
-        }
+      // Display main context usage
+      text += `🎯 **Context:** ${breakdown.grandTotal.toLocaleString()} / ${breakdown.contextLimit.toLocaleString()} (${breakdown.usagePercentage}%)\n`;
+      
+      // Show detailed breakdown in Claude Code style  
+      text += `   ↳ 🧠 System prompt: ${(breakdown.systemPrompt/1000).toFixed(1)}k tokens\n`;
+      text += `   ↳ 🔧 System tools: ${(breakdown.systemTools/1000).toFixed(1)}k tokens\n`;
+      text += `   ↳ 🔌 MCP tools: ${(breakdown.mcpTools/1000).toFixed(1)}k tokens\n`;
+      text += `   ↳ 🤖 Custom agents: ${(breakdown.customAgents/1000).toFixed(1)}k tokens\n`;
+      text += `   ↳ 📄 Memory files: ${(breakdown.memoryFiles/1000).toFixed(1)}k tokens\n`;
+      
+      if (breakdown.conversation > 0) {
+        text += `   ↳ 💬 Conversation: ${(breakdown.conversation/1000).toFixed(1)}k tokens\n`;
+        text += `      • ${breakdown.conversationDetails.inputTokens} in, ${breakdown.conversationDetails.outputTokens} out\n`;
       }
       
-      if (displayTokens.transactionCount > 0) {
-        // Calculate core tokens (input + output only, cache size tracked separately in Real Context)
-        const coreTokens = displayTokens.totalInputTokens + displayTokens.totalOutputTokens;
-        const usagePercentage = ((coreTokens / contextLimit) * 100).toFixed(1);
-        
-        // Always calculate real context usage including tool results and dynamic system overhead
-        const toolResultsTokens = await this.calculateToolResultsSize(sessionId);
-        const systemOverhead = await this.calculateSystemOverhead(sessionId, session.workingDirectory);
-        const realContextUsage = coreTokens + toolResultsTokens + systemOverhead;
-        const realUsagePercentage = ((realContextUsage / contextLimit) * 100).toFixed(1);
-        text += `🎯 **Context:** ${realContextUsage.toLocaleString()} / ${contextLimit.toLocaleString()} (${realUsagePercentage}%)\n`;
-        text += `   ↳ ${displayTokens.totalInputTokens} in, ${displayTokens.totalOutputTokens} out\n`;
-        text += `   ↳ ${displayTokens.transactionCount} transaction${displayTokens.transactionCount > 1 ? 's' : ''}\n`;
-        
-        if (session.isContinuation) {
-          // Show breakdown of previous vs current session tokens
-          text += `   ↳ 🔄 Previous sessions: ${(displayTokens.totalInputTokens - currentTokens.totalInputTokens + displayTokens.totalOutputTokens - currentTokens.totalOutputTokens).toLocaleString()} tokens\n`;
-          text += `   ↳ 📝 Current session: ${(currentTokens.totalInputTokens + currentTokens.totalOutputTokens).toLocaleString()} tokens\n`;
-        }
-        
-        // Show tool results size if present
-        if (toolResultsTokens > 0) {
-          text += `🔧 **Tool Results:** ${toolResultsTokens.toLocaleString()} tokens\n`;
-        }
-        
-        // Warning when approaching limit based on real usage
-        if (realUsagePercentage > 80) {
-          text += '⚠️ **Close to limit - consider /compact soon**\n';
-        }
-        
-        text += '\n';
-      } else {
-        // Always calculate real context usage even when no tokens
-        const toolResultsTokens = await this.calculateToolResultsSize(sessionId);
-        const systemOverhead = await this.calculateSystemOverhead(sessionId, session.workingDirectory);
-        const realContextUsage = toolResultsTokens + systemOverhead;
-        const realUsagePercentage = ((realContextUsage / contextLimit) * 100).toFixed(1);
-        text += `🎯 **Context:** ${realContextUsage.toLocaleString()} / ${contextLimit.toLocaleString()} (${realUsagePercentage}%)\n\n`;
+      text += `   ↳ ⛶ Free space: ${(breakdown.freeSpace/1000).toFixed(1)}k tokens\n`;
+      
+      // Warning when approaching limit
+      if (parseFloat(breakdown.usagePercentage) > 80) {
+        text += '⚠️ **Close to limit - consider /compact soon**\n';
       }
+      
+      text += '\n';
       
       // Activity and health status
       text += `💚 **Health:** ${healthStatus.isHealthy ? '✅ Healthy' : '⚠️ ' + healthStatus.reason}\n`;
@@ -835,44 +1057,33 @@ class SessionManager {
       text += '💬 **Messages:** -\n';
       text += '⏱ **Uptime:** -\n\n';
       
-      // Get cumulative token usage from stored session chain
-      const contextLimit = this.getContextWindowLimit(this.options.model);
+      // Accurate token usage information for stored session
+      const breakdown = await this.getAccurateTokenBreakdown(storedSessionId);
       
-      // Check if we have cumulative tokens cached, otherwise calculate them
-      let cumulativeTokens = this.cumulativeTokenCache.get(storedSessionId);
-      if (!cumulativeTokens) {
-        // Calculate cumulative tokens if not cached (e.g., after bot restart)
-        cumulativeTokens = await this.getCumulativeTokens(storedSessionId);
+      // Display main context usage
+      text += `🎯 **Context:** ${breakdown.grandTotal.toLocaleString()} / ${breakdown.contextLimit.toLocaleString()} (${breakdown.usagePercentage}%)\n`;
+      
+      // Show detailed breakdown in Claude Code style  
+      text += `   ↳ 🧠 System prompt: ${(breakdown.systemPrompt/1000).toFixed(1)}k tokens\n`;
+      text += `   ↳ 🔧 System tools: ${(breakdown.systemTools/1000).toFixed(1)}k tokens\n`;
+      text += `   ↳ 🔌 MCP tools: ${(breakdown.mcpTools/1000).toFixed(1)}k tokens\n`;
+      text += `   ↳ 🤖 Custom agents: ${(breakdown.customAgents/1000).toFixed(1)}k tokens\n`;
+      text += `   ↳ 📄 Memory files: ${(breakdown.memoryFiles/1000).toFixed(1)}k tokens\n`;
+      
+      if (breakdown.conversation > 0) {
+        text += `   ↳ 💬 Conversation: ${(breakdown.conversation/1000).toFixed(1)}k tokens\n`;
+        text += `      • ${breakdown.conversationDetails.inputTokens} in, ${breakdown.conversationDetails.outputTokens} out\n`;
+        text += '      • 🔗 Includes all parent sessions in chain\n';
       }
       
-      if (cumulativeTokens && cumulativeTokens.transactionCount > 0) {
-        // Calculate core tokens (input + output only, cache size tracked separately in Real Context)
-        const coreTokens = cumulativeTokens.totalInputTokens + cumulativeTokens.totalOutputTokens;
-        const usagePercentage = ((coreTokens / contextLimit) * 100).toFixed(1);
-        
-        // Calculate real context usage for stored session
-        const systemOverhead = await this.calculateSystemOverhead(storedSessionId, this.options.workingDirectory);
-        const realContextUsage = coreTokens + systemOverhead;
-        const realUsagePercentage = ((realContextUsage / contextLimit) * 100).toFixed(1);
-        
-        text += `🎯 **Context:** ${realContextUsage.toLocaleString()} / ${contextLimit.toLocaleString()} (${realUsagePercentage}%)\n`;
-        text += `   ↳ ${cumulativeTokens.totalInputTokens} in, ${cumulativeTokens.totalOutputTokens} out\n`;
-        text += `   ↳ ${cumulativeTokens.transactionCount} transaction${cumulativeTokens.transactionCount > 1 ? 's' : ''}\n`;
-        text += '   ↳ 🔗 Includes all parent sessions in chain\n';
-        
-        // Warning when approaching limit based on real usage
-        if (realUsagePercentage > 80) {
-          text += '⚠️ **Close to limit - consider /compact soon**\n';
-        }
-        
-        text += '\n';
-      } else {
-        // Calculate real context usage even when no cumulative tokens
-        const systemOverhead = await this.calculateSystemOverhead(storedSessionId, this.options.workingDirectory);
-        const realContextUsage = systemOverhead;
-        const realUsagePercentage = ((realContextUsage / contextLimit) * 100).toFixed(1);
-        text += `🎯 **Context:** ${realContextUsage.toLocaleString()} / ${contextLimit.toLocaleString()} (${realUsagePercentage}%)\n\n`;
+      text += `   ↳ ⛶ Free space: ${(breakdown.freeSpace/1000).toFixed(1)}k tokens\n`;
+      
+      // Warning when approaching limit
+      if (parseFloat(breakdown.usagePercentage) > 80) {
+        text += '⚠️ **Close to limit - consider /compact soon**\n';
       }
+      
+      text += '\n';
       
       text += '💡 **Send a message to resume this session**\n';
     }
@@ -2020,21 +2231,16 @@ class SessionManager {
         return;
       }
       
-      // Calculate real context including dynamic system overhead (CLAUDE.md, system prompts, active cache)
-      const coreTokens = tokens.totalInputTokens + tokens.totalOutputTokens;
-      const systemOverhead = await this.calculateSystemOverhead(session.sessionId, session.workingDirectory);
-      const toolResultsTokens = await this.calculateToolResultsSize(session.sessionId);
-      const realContextTokens = coreTokens + systemOverhead + toolResultsTokens;
+      // Use accurate token counting for auto-compact decisions
+      const breakdown = await this.getAccurateTokenBreakdown(session.sessionId);
+      const realUsagePercentage = parseFloat(breakdown.usagePercentage);
       
-      const contextLimit = this.getContextWindowLimit(this.options.model);
-      const coreUsagePercentage = (coreTokens / contextLimit) * 100;
-      const realUsagePercentage = (realContextTokens / contextLimit) * 100;
+      console.log(`[User ${session.userId}] Accurate context usage: ${breakdown.grandTotal}/${breakdown.contextLimit} (${breakdown.usagePercentage}%)`);
+      console.log(`[User ${session.userId}] Breakdown: System(${(breakdown.systemPrompt + breakdown.systemTools + breakdown.mcpTools + breakdown.customAgents + breakdown.memoryFiles)/1000}k) + Conversation(${breakdown.conversation/1000}k)`);
       
-      console.log(`[User ${session.userId}] Context usage: ${coreTokens}/${contextLimit} (${coreUsagePercentage.toFixed(1)}%) | Real: ${realContextTokens}/${contextLimit} (${realUsagePercentage.toFixed(1)}%)`);
-      
-      // Trigger auto-compact based on REAL context usage if less than 5% remaining (95% used)
+      // Trigger auto-compact based on accurate usage if less than 5% remaining (95% used)
       if (realUsagePercentage >= 95) {
-        console.log(`[User ${session.userId}] Auto-compact triggered at ${realUsagePercentage.toFixed(1)}% real usage`);
+        console.log(`[User ${session.userId}] Auto-compact triggered at ${realUsagePercentage.toFixed(1)}% accurate usage`);
         session.autoCompactInProgress = true;
         await this.performAutoCompact(session, chatId);
       }

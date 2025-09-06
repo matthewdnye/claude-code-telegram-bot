@@ -8,6 +8,7 @@ const TelegramFormatter = require('./telegram-formatter');
 const ActivityIndicator = require('./ActivityIndicator');
 const VoiceMessageHandler = require('./VoiceMessageHandler');
 const ImageHandler = require('./ImageHandler');
+const FileHandler = require('./FileHandler');
 const SessionManager = require('./SessionManager');
 const ProjectNavigator = require('./ProjectNavigator');
 const KeyboardHandlers = require('./KeyboardHandlers');
@@ -75,6 +76,9 @@ class StreamTelegramBot {
     
     // Image message handler
     this.imageHandler = new ImageHandler(this.bot, this.sessionManager, this.activityIndicator, this);
+    
+    // File message handler for documents, videos, audio, animations, and stickers
+    this.fileHandler = new FileHandler(this.bot, this.sessionManager, this.activityIndicator, this);
     
     // Unified web server with QTunnel WebSocket tunneling (replaces separate file browser and git diff servers)
     // TO DISABLE: Change to { disabled: true }
@@ -243,6 +247,136 @@ class StreamTelegramBot {
         await this.imageHandler.handlePhotoMessage(msg, this.processUserMessage.bind(this));
       } catch (error) {
         console.error('Error handling photo:', error);
+        await this.sessionManager.sendError(msg.chat.id, error);
+      }
+    });
+
+    // Handle document messages
+    this.bot.on('document', async (msg) => {
+      try {
+        // Ignore messages from bots (including self)
+        if (msg.from.is_bot) {
+          return;
+        }
+        
+        const userId = msg.from.id;
+        const username = msg.from.username || 'Unknown';
+        const chatId = msg.chat.id;
+        
+        console.log(`[DOCUMENT_MESSAGE] User ${userId} (@${username}) sent document "${msg.document.file_name}" in chat ${chatId}`);
+        
+        // Always check admin access first
+        if (!this.checkAdminAccess(msg.from.id, msg.chat.id)) {
+          return; // Access denied message already sent
+        }
+
+        await this.fileHandler.handleDocumentMessage(msg, this.processUserMessage.bind(this));
+      } catch (error) {
+        console.error('Error handling document:', error);
+        await this.sessionManager.sendError(msg.chat.id, error);
+      }
+    });
+
+    // Handle video messages
+    this.bot.on('video', async (msg) => {
+      try {
+        // Ignore messages from bots (including self)
+        if (msg.from.is_bot) {
+          return;
+        }
+        
+        const userId = msg.from.id;
+        const username = msg.from.username || 'Unknown';
+        const chatId = msg.chat.id;
+        
+        console.log(`[VIDEO_MESSAGE] User ${userId} (@${username}) sent video in chat ${chatId}`);
+        
+        // Always check admin access first
+        if (!this.checkAdminAccess(msg.from.id, msg.chat.id)) {
+          return; // Access denied message already sent
+        }
+
+        await this.fileHandler.handleVideoMessage(msg, this.processUserMessage.bind(this));
+      } catch (error) {
+        console.error('Error handling video:', error);
+        await this.sessionManager.sendError(msg.chat.id, error);
+      }
+    });
+
+    // Handle audio messages
+    this.bot.on('audio', async (msg) => {
+      try {
+        // Ignore messages from bots (including self)
+        if (msg.from.is_bot) {
+          return;
+        }
+        
+        const userId = msg.from.id;
+        const username = msg.from.username || 'Unknown';
+        const chatId = msg.chat.id;
+        
+        console.log(`[AUDIO_MESSAGE] User ${userId} (@${username}) sent audio "${msg.audio.title || 'Unknown'}" in chat ${chatId}`);
+        
+        // Always check admin access first
+        if (!this.checkAdminAccess(msg.from.id, msg.chat.id)) {
+          return; // Access denied message already sent
+        }
+
+        await this.fileHandler.handleAudioMessage(msg, this.processUserMessage.bind(this));
+      } catch (error) {
+        console.error('Error handling audio:', error);
+        await this.sessionManager.sendError(msg.chat.id, error);
+      }
+    });
+
+    // Handle animation/GIF messages
+    this.bot.on('animation', async (msg) => {
+      try {
+        // Ignore messages from bots (including self)
+        if (msg.from.is_bot) {
+          return;
+        }
+        
+        const userId = msg.from.id;
+        const username = msg.from.username || 'Unknown';
+        const chatId = msg.chat.id;
+        
+        console.log(`[ANIMATION_MESSAGE] User ${userId} (@${username}) sent animation in chat ${chatId}`);
+        
+        // Always check admin access first
+        if (!this.checkAdminAccess(msg.from.id, msg.chat.id)) {
+          return; // Access denied message already sent
+        }
+
+        await this.fileHandler.handleAnimationMessage(msg, this.processUserMessage.bind(this));
+      } catch (error) {
+        console.error('Error handling animation:', error);
+        await this.sessionManager.sendError(msg.chat.id, error);
+      }
+    });
+
+    // Handle sticker messages
+    this.bot.on('sticker', async (msg) => {
+      try {
+        // Ignore messages from bots (including self)
+        if (msg.from.is_bot) {
+          return;
+        }
+        
+        const userId = msg.from.id;
+        const username = msg.from.username || 'Unknown';
+        const chatId = msg.chat.id;
+        
+        console.log(`[STICKER_MESSAGE] User ${userId} (@${username}) sent sticker in chat ${chatId}`);
+        
+        // Always check admin access first
+        if (!this.checkAdminAccess(msg.from.id, msg.chat.id)) {
+          return; // Access denied message already sent
+        }
+
+        await this.fileHandler.handleStickerMessage(msg, this.processUserMessage.bind(this));
+      } catch (error) {
+        console.error('Error handling sticker:', error);
         await this.sessionManager.sendError(msg.chat.id, error);
       }
     });
@@ -423,6 +557,14 @@ class StreamTelegramBot {
       console.log(`[SLASH_COMMAND] User ${userId} (@${username}) executed /status in chat ${msg.chat.id}`);
       console.log(`[COMPONENT] SessionManager.showSessionStatus - chatId: ${msg.chat.id}`);
       await this.sessionManager.showSessionStatus(msg.chat.id);
+    });
+
+    this.bot.onText(/\/context/, async (msg) => {
+      const userId = msg.from.id;
+      const username = msg.from.username || 'Unknown';
+      console.log(`[SLASH_COMMAND] User ${userId} (@${username}) executed /context in chat ${msg.chat.id}`);
+      console.log(`[COMPONENT] SessionManager.showContextBreakdown - chatId: ${msg.chat.id}`);
+      await this.sessionManager.showContextBreakdown(msg.chat.id);
     });
 
     this.bot.onText(/\/new/, async (msg) => {
@@ -1200,9 +1342,10 @@ class StreamTelegramBot {
     // Note: We keep sessionStorage for session persistence
     console.log(`💾 Preserved session data for ${this.sessionManager.sessionStorage.size} users`);
     
-    // Clear voice handler, image handler, and project cache
+    // Clear voice handler, image handler, file handler, and project cache
     this.voiceHandler.cleanup();
     this.imageHandler.cleanup();
+    this.fileHandler.cleanup();
     this.projectNavigator.cleanup();
     
     // Stop polling
@@ -1619,8 +1762,15 @@ class StreamTelegramBot {
 
     // Check if previous request is still processing
     if (session.processor.isActive()) {
-      console.log(`[ProcessUserMessage] Previous request still processing for user ${userId}`);
-      await this.safeSendMessage(chatId, '⏳ *Processing previous request...*\nPlease wait or use /cancel');
+      console.log(`[ProcessUserMessage] Previous request still processing for user ${userId}, queuing message`);
+      
+      // Queue the message for processing after current session ends
+      this.sessionManager.queueMessage(userId, chatId, finalText);
+      
+      await this.safeSendMessage(chatId, 
+        '⏳ **Message queued**\n\n' +
+        'Your message will be processed automatically when the current session completes.\n\n' +
+        'Use /cancel to stop the current session.');
       return;
     }
 
@@ -1738,7 +1888,7 @@ class StreamTelegramBot {
     const instructionMessage = `🔗 **Concat Mode Enabled**
 
 📝 **How to use:**
-• Send any messages (text, voice, images)
+• Send any messages (text, voice, images, documents, videos, audio, animations, stickers)
 • All messages will be collected in a buffer
 • Click "📤 Concat Send" to process all at once
 • Click "🔗 Concat On" again to disable
@@ -1834,6 +1984,73 @@ class StreamTelegramBot {
         }
         combinedText += `Image: ${message.imagePath}\n\n`;
         imagePaths.push(message.imagePath);
+        break;
+          
+      case 'document':
+        combinedText += `[Message ${messageNumber} - Document${message.content ? ' with caption' : ''}]\n`;
+        if (message.content) {
+          combinedText += `Caption: ${message.content}\n`;
+        }
+        combinedText += `Document: ${message.filePath}\n`;
+        if (message.fileInfo) {
+          combinedText += `Filename: ${message.fileInfo.name}\n`;
+          combinedText += `Size: ${Math.round(message.fileInfo.size / 1024)}KB\n`;
+          if (message.fileInfo.mimeType) {
+            combinedText += `MIME Type: ${message.fileInfo.mimeType}\n`;
+          }
+        }
+        combinedText += '\n';
+        break;
+          
+      case 'video':
+        combinedText += `[Message ${messageNumber} - Video${message.content ? ' with caption' : ''}]\n`;
+        if (message.content) {
+          combinedText += `Caption: ${message.content}\n`;
+        }
+        combinedText += `Video: ${message.filePath}\n`;
+        if (message.fileInfo) {
+          combinedText += `Filename: ${message.fileInfo.name}\n`;
+          combinedText += `Size: ${Math.round(message.fileInfo.size / 1024)}KB\n`;
+        }
+        combinedText += '\n';
+        break;
+          
+      case 'audio':
+        combinedText += `[Message ${messageNumber} - Audio${message.content ? ' with caption' : ''}]\n`;
+        if (message.content) {
+          combinedText += `Caption: ${message.content}\n`;
+        }
+        combinedText += `Audio: ${message.filePath}\n`;
+        if (message.fileInfo) {
+          combinedText += `Filename: ${message.fileInfo.name}\n`;
+          combinedText += `Size: ${Math.round(message.fileInfo.size / 1024)}KB\n`;
+        }
+        combinedText += '\n';
+        break;
+          
+      case 'animation':
+        combinedText += `[Message ${messageNumber} - Animation${message.content ? ' with caption' : ''}]\n`;
+        if (message.content) {
+          combinedText += `Caption: ${message.content}\n`;
+        }
+        combinedText += `Animation: ${message.filePath}\n`;
+        if (message.fileInfo) {
+          combinedText += `Filename: ${message.fileInfo.name}\n`;
+          combinedText += `Size: ${Math.round(message.fileInfo.size / 1024)}KB\n`;
+        }
+        combinedText += '\n';
+        break;
+          
+      case 'sticker':
+        combinedText += `[Message ${messageNumber} - Sticker]\n`;
+        if (message.content) {
+          combinedText += `Emoji: ${message.content}\n`;
+        }
+        combinedText += `Sticker: ${message.filePath}\n`;
+        if (message.fileInfo) {
+          combinedText += `Size: ${Math.round(message.fileInfo.size / 1024)}KB\n`;
+        }
+        combinedText += '\n';
         break;
       }
     }

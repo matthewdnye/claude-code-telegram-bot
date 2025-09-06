@@ -1,4 +1,5 @@
 const axios = require('axios');
+const config = require('./config.json');
 
 /**
  * ActivityWatch Integration
@@ -96,9 +97,9 @@ class ActivityWatchIntegration {
                 }
             };
 
-            // Retry mechanism for network issues
+            // Enhanced retry mechanism for network issues
             let response;
-            const maxRetries = 3;
+            const maxRetries = 5;
             let lastError;
             
             for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -108,7 +109,9 @@ class ActivityWatchIntegration {
                         [event],
                         {
                             headers: { 'Content-Type': 'application/json' },
-                            timeout: 5000
+                            timeout: 10000, // Increased timeout
+                            // Add connection keep-alive
+                            httpAgent: new (require('http').Agent)({ keepAlive: true }),
                         }
                     );
                     break; // Success, exit retry loop
@@ -120,13 +123,16 @@ class ActivityWatchIntegration {
                         attemptError.code === 'ECONNRESET' ||
                         attemptError.code === 'ENOTFOUND' ||
                         attemptError.code === 'ETIMEDOUT' ||
+                        attemptError.code === 'ECONNREFUSED' ||
                         attemptError.message.includes('socket hang up') ||
-                        attemptError.message.includes('timeout')
+                        attemptError.message.includes('timeout') ||
+                        attemptError.message.includes('ECONNRESET')
                     );
                     
                     if (isRetryable && attempt < maxRetries) {
-                        console.warn(`[ActivityWatch] Recording attempt ${attempt} failed (${attemptError.message}), retrying...`);
-                        await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Exponential backoff
+                        const backoffDelay = Math.min(1000 * Math.pow(2, attempt - 1), 5000); // Exponential backoff, max 5s
+                        console.warn(`[ActivityWatch] Main recording attempt ${attempt} failed (${attemptError.message}), retrying in ${backoffDelay}ms...`);
+                        await new Promise(resolve => setTimeout(resolve, backoffDelay));
                         continue;
                     } else {
                         // Not retryable or max retries exceeded
@@ -166,53 +172,76 @@ class ActivityWatchIntegration {
         try {
             const windowBucket = `aw-watcher-window_${this.hostname}`;
             
-            // Create fake window event that looks like a real application
+            // Create fake window event with configured app name for work categorization
+            // Using more generic IT/development-related app names
             const windowEvent = {
                 timestamp: timestamp,
                 duration: durationSeconds,
                 data: {
-                    app: `${projectName.toLowerCase()}-ai-assistant`,
-                    title: `${projectName} AI Assistant - Session ${sessionId?.slice(-8) || 'work'}`
+                    app: config.activityWatch.integration.fakeAppName,
+                    title: `${config.activityWatch.integration.sessionTitleTemplate} - ${projectName} AI Assistant Session ${sessionId?.slice(-8) || 'work'}`
                 }
             };
 
-            // Try to record to window bucket
-            try {
-                await axios.post(
-                    `${this.baseUrl}/buckets/${windowBucket}/events`,
-                    [windowEvent],
-                    {
-                        headers: { 'Content-Type': 'application/json' },
-                        timeout: 5000
-                    }
-                );
-                console.log(`[ActivityWatch] Window event recorded: ${windowEvent.data.app} | ${durationSeconds.toFixed(1)}s`);
-            } catch (error) {
-                // If window bucket doesn't exist, try to create it first
-                if (error.response?.status === 404) {
-                    console.log(`[ActivityWatch] Creating window bucket: ${windowBucket}`);
-                    await axios.post(`${this.baseUrl}/buckets/${windowBucket}`, {
-                        type: 'currentwindow',
-                        client: 'aw-watcher-window',
-                        hostname: this.hostname
-                    });
-                    
-                    // Retry recording after creating bucket
+            // Enhanced retry mechanism for socket issues
+            const maxRetries = 5;
+            let lastError;
+            
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
                     await axios.post(
                         `${this.baseUrl}/buckets/${windowBucket}/events`,
                         [windowEvent],
                         {
                             headers: { 'Content-Type': 'application/json' },
-                            timeout: 5000
+                            timeout: 10000, // Increased timeout
+                            // Add connection keep-alive
+                            httpAgent: new (require('http').Agent)({ keepAlive: true }),
                         }
                     );
-                    console.log(`[ActivityWatch] Window event recorded after bucket creation: ${windowEvent.data.app}`);
-                } else {
-                    throw error;
+                    console.log(`[ActivityWatch] Window event recorded: ${windowEvent.data.app} | ${durationSeconds.toFixed(1)}s | attempt ${attempt}`);
+                    return; // Success, exit function
+                } catch (error) {
+                    lastError = error;
+                    
+                    // Handle bucket creation first
+                    if (error.response?.status === 404 && attempt === 1) {
+                        console.log(`[ActivityWatch] Creating window bucket: ${windowBucket}`);
+                        try {
+                            await axios.post(`${this.baseUrl}/buckets/${windowBucket}`, {
+                                type: 'currentwindow',
+                                client: 'aw-watcher-window',
+                                hostname: this.hostname
+                            }, { timeout: 10000 });
+                            continue; // Retry recording after creating bucket
+                        } catch (bucketError) {
+                            console.warn(`[ActivityWatch] Could not create window bucket: ${bucketError.message}`);
+                        }
+                    }
+                    
+                    // Handle retryable errors
+                    const isRetryable = (
+                        error.code === 'ECONNRESET' ||
+                        error.code === 'ENOTFOUND' ||
+                        error.code === 'ETIMEDOUT' ||
+                        error.code === 'ECONNREFUSED' ||
+                        error.message.includes('socket hang up') ||
+                        error.message.includes('timeout') ||
+                        error.message.includes('ECONNRESET')
+                    );
+                    
+                    if (isRetryable && attempt < maxRetries) {
+                        const backoffDelay = Math.min(1000 * Math.pow(2, attempt - 1), 5000); // Exponential backoff, max 5s
+                        console.warn(`[ActivityWatch] Window event attempt ${attempt} failed (${error.message}), retrying in ${backoffDelay}ms...`);
+                        await new Promise(resolve => setTimeout(resolve, backoffDelay));
+                        continue;
+                    } else {
+                        throw error;
+                    }
                 }
             }
         } catch (error) {
-            console.warn(`[ActivityWatch] Could not record window event: ${error.message}`);
+            console.warn(`[ActivityWatch] Could not record window event after ${maxRetries} attempts: ${error.message}`);
         }
     }
 

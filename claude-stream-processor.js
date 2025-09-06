@@ -42,6 +42,9 @@ class ClaudeStreamProcessor extends EventEmitter {
     this.processExitCode = null;
     this.promptTooLongDetected = false; // Track if "prompt too long" was detected during processing
 
+    // Additional arguments for Claude Code (e.g., --mcp-config)
+    this.additionalArgs = [];
+
     // Test support: Store last Claude arguments for validation
     this.lastClaudeArgs = null;
     this.lastClaudeOptions = null;
@@ -64,6 +67,21 @@ class ClaudeStreamProcessor extends EventEmitter {
 
   static clearClaudeTestRegistry() {
     global.claudeTestRegistry = [];
+  }
+
+  /**
+   * Set additional arguments for Claude Code (e.g., --mcp-config)
+   */
+  setAdditionalArgs(args) {
+    this.additionalArgs = Array.isArray(args) ? args : [];
+    console.log('[ClaudeStream] Additional args set:', this.additionalArgs);
+  }
+
+  /**
+   * Get additional arguments
+   */
+  getAdditionalArgs() {
+    return this.additionalArgs;
   }
 
   /**
@@ -138,10 +156,56 @@ class ClaudeStreamProcessor extends EventEmitter {
       this.promptTooLongDetected = false; // Reset prompt-too-long detection for new process
 
       console.log('[ClaudeStream] Working directory:', this.options.workingDirectory);
-      console.log('[ClaudeStream] Spawning Claude with args:', args);
+      console.log('[ClaudeStream] Original args:', args);
       
-      // Build copyable command line
-      const quotedArgs = args.map(arg => {
+      // Add additional arguments (e.g., --mcp-config) if any
+      const finalArgs = [...args];
+      if (this.additionalArgs.length > 0) {
+        // Check if args contain --continue, --resume, or -c, -r flags
+        const hasSessionFlags = finalArgs.some((arg, index) => {
+          // Check for exact flags
+          if (arg === '--continue' || arg === '--resume' || arg === '-c') {
+            return true;
+          }
+          // Check for -r followed by session ID argument
+          if (arg === '-r' && index < finalArgs.length - 1) {
+            return true;
+          }
+          return false;
+        });
+        
+        // Filter out --session-id from additionalArgs if session flags are present
+        let filteredAdditionalArgs = this.additionalArgs;
+        if (hasSessionFlags) {
+          filteredAdditionalArgs = this.additionalArgs.filter((arg, index) => {
+            // Remove --session-id and its value
+            if (arg === '--session-id') {
+              return false; // Remove --session-id flag
+            }
+            if (index > 0 && this.additionalArgs[index - 1] === '--session-id') {
+              return false; // Remove --session-id value
+            }
+            return true;
+          });
+          
+          if (filteredAdditionalArgs.length !== this.additionalArgs.length) {
+            console.log('[ClaudeStream] Filtered out --session-id due to conflict with session flags');
+          }
+        }
+        
+        if (filteredAdditionalArgs.length > 0) {
+          // Insert additional args before the prompt (last argument)
+          const prompt = finalArgs.pop(); // Remove prompt from end
+          finalArgs.push(...filteredAdditionalArgs); // Add filtered additional args
+          finalArgs.push(prompt); // Add prompt back to end
+          console.log('[ClaudeStream] Additional args (filtered):', filteredAdditionalArgs);
+        }
+      }
+      
+      console.log('[ClaudeStream] Final args:', finalArgs);
+      
+      // Build copyable command line using final args
+      const quotedArgs = finalArgs.map(arg => {
         // Quote arguments that contain spaces or special characters
         if (arg.includes(' ') || arg.includes('"') || arg.includes('\'')) {
           return `"${arg.replace(/"/g, '\\"')}"`;
@@ -170,7 +234,7 @@ class ClaudeStreamProcessor extends EventEmitter {
         console.log('[ClaudeStream] Test environment detected, using mock Claude process');
         
         // Store arguments for test validation
-        this.lastClaudeArgs = args;
+        this.lastClaudeArgs = finalArgs;
         this.lastClaudeOptions = {
           cwd: this.options.workingDirectory,
           stdio: ['ignore', 'pipe', 'pipe']
@@ -235,7 +299,7 @@ class ClaudeStreamProcessor extends EventEmitter {
         
         // Only spawn real Claude CLI process if we're absolutely sure we're not in test
         console.log('[ClaudeStream] Production environment confirmed, spawning real Claude process');
-        this.currentProcess = spawn('claude', args, {
+        this.currentProcess = spawn('claude', finalArgs, {
           cwd: this.options.workingDirectory,
           stdio: ['ignore', 'pipe', 'pipe'] // stdin ignored, capture stdout/stderr
         });

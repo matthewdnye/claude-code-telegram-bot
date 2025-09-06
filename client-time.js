@@ -6,12 +6,13 @@
  */
 
 const axios = require('axios');
+const config = require('./config.json');
 
 const ACTIVITY_WATCH_URL = 'http://localhost:5600/api/0';
 const BOT_BUCKET = 'claude-bot-sessions';
 const WINDOW_BUCKET = 'aw-watcher-window_errogaht-G1619-04';
 
-async function getClientTime(days = 1, project = 'it-fit') {
+async function getClientTime(days = 1, project = config.activityWatch.defaultProject) {
     try {
         console.log(`\n💰 ВРЕМЯ ДЛЯ КЛИЕНТА: проект "${project}" (${days} дн.)\n`);
 
@@ -104,6 +105,6 @@ async function getClientTime(days = 1, project = 'it-fit') {
 
 // Запуск
 const days = parseInt(process.argv[2]) || 1;
-const project = process.argv[3] || 'it-fit';
+const project = process.argv[3] || config.activityWatch.defaultProject;
 
 getClientTime(days, project);
