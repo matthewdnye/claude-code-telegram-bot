@@ -43,6 +43,7 @@
   "author": "Your Name",
   "license": "MIT",
   "dependencies": {
+    "@anthropic-ai/claude-code": "^1.0.108",
     "@modelcontextprotocol/sdk": "^1.17.5",
     "@ngrok/ngrok": "^1.5.2",
     "axios": "^1.11.0",

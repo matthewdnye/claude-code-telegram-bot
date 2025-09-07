@@ -29,6 +29,9 @@ class UnifiedWebServer {
         // Flag to disable web server functionality entirely
         this.disabled = options.disabled || false;
         
+        // Store configManager reference for feature flags
+        this.configManager = options.configManager || null;
+        
         // Use provided security system or create new one
         this.security = security || new WebServerSecurity(botInstance);
         
@@ -491,16 +494,25 @@ class UnifiedWebServer {
             });
 
             const localUrl = `http://localhost:${this.port}`;
+            this.publicUrl = localUrl;
             
-            // Create QTunnel WebSocket tunnel
-            try {
-                console.log(`[${this.botInstance}] Creating QTunnel...`);
-                const publicUrl = await this.tunnelAdapter.createTunnel(this.port, 'unified');
-                this.publicUrl = publicUrl;
-                console.log(`[${this.botInstance}] ✅ Unified server public URL: ${publicUrl}`);
-            } catch (tunnelError) {
-                console.log(`[${this.botInstance}] ⚠️ QTunnel failed, using local access only: ${tunnelError.message}`);
-                this.publicUrl = localUrl;
+            // Check if QTunnel is enabled before attempting to create tunnel
+            const qTunnelEnabled = this.getQTunnelEnabled();
+            
+            if (qTunnelEnabled && this.tunnelAdapter.token) {
+                // Create QTunnel WebSocket tunnel
+                try {
+                    console.log(`[${this.botInstance}] Creating QTunnel...`);
+                    const publicUrl = await this.tunnelAdapter.createTunnel(this.port, 'unified');
+                    this.publicUrl = publicUrl;
+                    console.log(`[${this.botInstance}] ✅ Unified server public URL: ${publicUrl}`);
+                } catch (tunnelError) {
+                    console.log(`[${this.botInstance}] ⚠️ QTunnel failed, using local access only: ${tunnelError.message}`);
+                    this.publicUrl = localUrl;
+                }
+            } else {
+                const reason = !qTunnelEnabled ? 'QTunnel disabled in config' : 'No QTunnel token configured';
+                console.log(`[${this.botInstance}] 🏠 Using local access only: ${reason}`);
             }
             
             this.isStarted = true;
@@ -559,6 +571,13 @@ class UnifiedWebServer {
             this.isStarting = false;
             throw error;
         }
+    }
+
+    /**
+     * Get QTunnel enabled status from config
+     */
+    getQTunnelEnabled() {
+        return this.configManager?.getQTunnelEnabled() || false;
     }
 
 }

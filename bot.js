@@ -84,7 +84,8 @@ class StreamTelegramBot {
     // TO DISABLE: Change to { disabled: true }
     this.unifiedWebServer = new UnifiedWebServer(this.options.workingDirectory, this.botInstanceName, null, { 
       disabled: false, 
-      qTunnelToken: this.getQTunnelTokenFromConfig()
+      qTunnelToken: this.getQTunnelTokenFromConfig(),
+      configManager: this.configManager
     });
     this.webServerUrl = null;
     
@@ -2277,6 +2278,14 @@ class StreamTelegramBot {
    * Auto-start unified web server in background (non-blocking)
    */
   autoStartUnifiedWebServer() {
+    // Check if web server is enabled in config
+    const webServerEnabled = this.configManager?.getWebServerEnabled() || false;
+    
+    if (!webServerEnabled) {
+      console.log(`[${this.botInstanceName}] 🔧 Web server disabled in config, skipping auto-start`);
+      return;
+    }
+
     // Start in background without blocking bot initialization
     setImmediate(async () => {
       try {

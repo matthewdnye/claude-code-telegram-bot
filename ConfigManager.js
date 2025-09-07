@@ -224,6 +224,48 @@ class ConfigManager {
     }
 
     /**
+     * Get Claude SDK usage flag
+     */
+    getUseClaudeSDK() {
+        return this.get('useClaudeSDK', false);
+    }
+
+    /**
+     * Set Claude SDK usage flag
+     */
+    setUseClaudeSDK(enabled) {
+        this.set('useClaudeSDK', enabled);
+    }
+
+    /**
+     * Get QTunnel enabled flag
+     */
+    getQTunnelEnabled() {
+        return this.get('qTunnelEnabled', false);
+    }
+
+    /**
+     * Set QTunnel enabled flag
+     */
+    setQTunnelEnabled(enabled) {
+        this.set('qTunnelEnabled', enabled);
+    }
+
+    /**
+     * Get Web Server enabled flag
+     */
+    getWebServerEnabled() {
+        return this.get('webServerEnabled', false);
+    }
+
+    /**
+     * Set Web Server enabled flag
+     */
+    setWebServerEnabled(enabled) {
+        this.set('webServerEnabled', enabled);
+    }
+
+    /**
      * Persist current in-memory config to disk
      * Only called when config actually changes
      */

@@ -1,4 +1,5 @@
 const ClaudeStreamProcessor = require('./claude-stream-processor');
+const ClaudeSDKProcessor = require('./ClaudeSDKProcessor');
 const ActivityWatchIntegration = require('./ActivityWatchIntegration');
 const ClaudeCodeTokenCounter = require('./ClaudeCodeTokenCounter');
 const TelegramMCPIntegration = require('./TelegramMCPIntegration');
@@ -39,8 +40,8 @@ class SessionManager {
     
     // ActivityWatch integration for time tracking
     this.activityWatch = new ActivityWatchIntegration({
-      enabled: this.mainBot.configManager.getActivityWatchEnabled(),
-      timeMultiplier: this.mainBot.configManager.getActivityWatchTimeMultiplier()
+      enabled: this.mainBot?.configManager?.getActivityWatchEnabled() || true,
+      timeMultiplier: this.mainBot?.configManager?.getActivityWatchTimeMultiplier() || 1.0
     });
     
     // Claude Code accurate token counter
@@ -112,6 +113,21 @@ class SessionManager {
   }
 
   /**
+   * Processor factory - create Claude processor based on feature flag
+   */
+  createClaudeProcessor(options) {
+    const useClaudeSDK = this.mainBot?.configManager?.getUseClaudeSDK() || false;
+    
+    if (useClaudeSDK) {
+      console.log('[SessionManager] Using Claude SDK processor');
+      return new ClaudeSDKProcessor(options);
+    } else {
+      console.log('[SessionManager] Using Claude Stream processor (legacy)');
+      return new ClaudeStreamProcessor(options);
+    }
+  }
+
+  /**
    * Create new user session with Claude processor
    */
   async createUserSession(userId, chatId) {
@@ -121,7 +137,8 @@ class SessionManager {
     const userModel = this.getUserModel(userId) || this.options.model;
     console.log(`[SessionManager] Debug: userModel=${userModel}, getUserModel result=${this.getUserModel(userId)}, options.model=${this.options.model}, workingDir=${this.options.workingDirectory}`);
     
-    const processor = new ClaudeStreamProcessor({
+    // Processor factory pattern - choose based on feature flag
+    const processor = this.createClaudeProcessor({
       model: userModel,
       workingDirectory: this.options.workingDirectory
     });
@@ -2814,10 +2831,10 @@ class SessionManager {
     
     // Save to config using ConfigManager
     if (settings.enabled !== undefined) {
-      this.mainBot.configManager.setActivityWatchEnabled(settings.enabled);
+      this.mainBot?.configManager?.setActivityWatchEnabled(settings.enabled);
     }
     if (settings.timeMultiplier !== undefined) {
-      this.mainBot.configManager.setActivityWatchTimeMultiplier(settings.timeMultiplier);
+      this.mainBot?.configManager?.setActivityWatchTimeMultiplier(settings.timeMultiplier);
     }
   }
 
@@ -2829,7 +2846,7 @@ class SessionManager {
     this.activityWatch.setEnabled(enabled);
     
     // Save to config using ConfigManager
-    this.mainBot.configManager.setActivityWatchEnabled(enabled);
+    this.mainBot?.configManager?.setActivityWatchEnabled(enabled);
   }
 
   /**
@@ -2840,7 +2857,7 @@ class SessionManager {
     this.activityWatch.setTimeMultiplier(multiplier);
     
     // Save to config using ConfigManager
-    this.mainBot.configManager.setActivityWatchTimeMultiplier(multiplier);
+    this.mainBot?.configManager?.setActivityWatchTimeMultiplier(multiplier);
   }
 
   /**
