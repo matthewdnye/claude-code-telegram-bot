@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 /**
- * Полный отчет времени для клиента: обычное время + время бота
- * Usage: node client-time.js [дни] [проект]
+ * Full time report for client: regular time + bot time
+ * Usage: node client-time.js [days] [project]
  */
 
 const axios = require('axios');
@@ -14,9 +14,9 @@ const WINDOW_BUCKET = 'aw-watcher-window_errogaht-G1619-04';
 
 async function getClientTime(days = 1, project = config.activityWatch.defaultProject) {
     try {
-        console.log(`\n💰 ВРЕМЯ ДЛЯ КЛИЕНТА: проект "${project}" (${days} дн.)\n`);
+        console.log(`\n💰 CLIENT TIME: project "${project}" (${days} days)\n`);
 
-        // 1. ПОЛУЧИТЬ ВРЕМЯ БОТА (с множителем)
+        // 1. GET BOT TIME (with multiplier)
         let botTime = 0, botOriginalTime = 0, multiplier = 1, botEvents = [];
         
         try {
@@ -29,14 +29,14 @@ async function getClientTime(days = 1, project = config.activityWatch.defaultPro
                 return event.data.project === project && eventDate >= cutoffDate;
             });
 
-            botTime = botEvents.reduce((sum, event) => sum + event.duration, 0) / 3600; // в часах
+            botTime = botEvents.reduce((sum, event) => sum + event.duration, 0) / 3600; // in hours
             botOriginalTime = botEvents.reduce((sum, event) => sum + (event.data.original_duration || event.duration), 0) / 3600;
             multiplier = botEvents[0]?.data?.time_multiplier || 1;
         } catch (error) {
-            console.log('⚠️ Не удалось получить время бота:', error.message);
+            console.log('⚠️ Could not get bot time:', error.message);
         }
 
-        // 2. ПОЛУЧИТЬ ОБЫЧНОЕ ВРЕМЯ (окна/приложения)  
+        // 2. GET REGULAR TIME (windows/applications)  
         let windowTime = 0, windowEvents = [];
         
         try {
@@ -46,13 +46,13 @@ async function getClientTime(days = 1, project = config.activityWatch.defaultPro
         
             const todayStr = new Date().toISOString().split('T')[0];
             if (days === 1) {
-                // Для сегодня - точная дата
+                // For today - exact date
                 windowEvents = windowResponse.data.filter(event => 
                     event.timestamp.startsWith(todayStr) && 
                     (event.data.title || '').toLowerCase().includes(project.toLowerCase())
                 );
             } else {
-                // Для нескольких дней - диапазон дат
+                // For multiple days - date range
                 windowEvents = windowResponse.data.filter(event => {
                     const eventDate = new Date(event.timestamp);
                     return eventDate >= cutoffDate && 
@@ -60,32 +60,32 @@ async function getClientTime(days = 1, project = config.activityWatch.defaultPro
                 });
             }
 
-            windowTime = windowEvents.reduce((sum, event) => sum + event.duration, 0) / 3600; // в часах
+            windowTime = windowEvents.reduce((sum, event) => sum + event.duration, 0) / 3600; // in hours
         } catch (error) {
-            console.log('⚠️ Не удалось получить обычное время:', error.message);
+            console.log('⚠️ Could not get regular time:', error.message);
         }
 
-        // 3. ИТОГИ
+        // 3. TOTALS
         const totalTime = windowTime + botTime;
         
-        console.log('📊 РАЗБИВКА:');
+        console.log('📊 BREAKDOWN:');
         console.log('=' .repeat(50));
-        console.log(`🖥️  Обычная работа (окна):     ${windowTime.toFixed(2)} ч`);
-        console.log(`🤖 Работа с ботом:            ${botOriginalTime.toFixed(2)} ч → ${botTime.toFixed(2)} ч (${multiplier}x)`);
+        console.log(`🖥️  Regular work (windows):   ${windowTime.toFixed(2)} h`);
+        console.log(`🤖 Bot work:                  ${botOriginalTime.toFixed(2)} h → ${botTime.toFixed(2)} h (${multiplier}x)`);
         console.log('=' .repeat(50));
-        console.log(`💰 ИТОГО ДЛЯ КЛИЕНТА:         ${totalTime.toFixed(2)} ч`);
+        console.log(`💰 TOTAL FOR CLIENT:          ${totalTime.toFixed(2)} h`);
         
-        // 4. ДЕТАЛИ
-        console.log(`\n📈 ДЕТАЛИ:`);
-        console.log(`- Обычное время: ${windowEvents.length} событий, ${windowTime.toFixed(2)} часов`);
-        console.log(`- Время бота: ${botEvents.length} сессий, ${botTime.toFixed(2)} часов (множитель ${multiplier}x)`);
-        console.log(`- Дата: ${days === 1 ? 'сегодня' : `последние ${days} дней`}`);
+        // 4. DETAILS
+        console.log(`\n📈 DETAILS:`);
+        console.log(`- Regular time: ${windowEvents.length} events, ${windowTime.toFixed(2)} hours`);
+        console.log(`- Bot time: ${botEvents.length} sessions, ${botTime.toFixed(2)} hours (multiplier ${multiplier}x)`);
+        console.log(`- Date: ${days === 1 ? 'today' : `last ${days} days`}`);
 
-        // 5. ДЛЯ КОПИРОВАНИЯ КЛИЕНТУ
-        console.log(`\n📝 ДЛЯ КЛИЕНТА:`);
-        console.log(`Проект: ${project}`);
-        console.log(`Дата: ${new Date().toLocaleDateString('ru-RU')}`);
-        console.log(`Время работы: ${totalTime.toFixed(2)} часов`);
+        // 5. FOR CLIENT COPY
+        console.log(`\n📝 FOR CLIENT:`);
+        console.log(`Project: ${project}`);
+        console.log(`Date: ${new Date().toLocaleDateString('en-US')}`);
+        console.log(`Work time: ${totalTime.toFixed(2)} hours`);
 
         return {
             windowTime: windowTime,
@@ -96,14 +96,14 @@ async function getClientTime(days = 1, project = config.activityWatch.defaultPro
         };
 
     } catch (error) {
-        console.error('❌ Ошибка:', error.message);
-        console.log('\n🔧 Проверь:');
-        console.log('• ActivityWatch запущен: curl http://localhost:5600/api/0/info');
-        console.log('• Бот записывает время');
+        console.error('❌ Error:', error.message);
+        console.log('\n🔧 Check:');
+        console.log('• ActivityWatch is running: curl http://localhost:5600/api/0/info');
+        console.log('• Bot is recording time');
     }
 }
 
-// Запуск
+// Launch
 const days = parseInt(process.argv[2]) || 1;
 const project = process.argv[3] || config.activityWatch.defaultProject;
 

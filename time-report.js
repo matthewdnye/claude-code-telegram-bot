@@ -95,7 +95,7 @@ async function getTimeReport(days = 7, project = config.activityWatch.defaultPro
         // Add total row
         csvData.push(`TOTAL,${totalSessions},${(totalOriginalTime / 3600).toFixed(2)},${(totalRecordedTime / 3600).toFixed(2)},`);
 
-        const csvFilename = `${project}-time-report-${new Date().toISOString().split('T')[0]}.csv`;
+        const csvFilename = `${project}-${config.activityWatch.reportSettings.prefix}-${new Date().toISOString().split('T')[0]}.csv`;
         fs.writeFileSync(csvFilename, csvData.join('\n'));
         
         console.log(`\n💾 CSV report saved as: ${csvFilename}`);
