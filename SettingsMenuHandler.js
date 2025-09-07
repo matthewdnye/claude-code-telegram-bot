@@ -18,6 +18,12 @@ class SettingsMenuHandler {
           { text: '🤖 AI Model Selection', callback_data: 'settings:model_selection' }
         ],
         [
+          { text: '🧠 Thinking Mode', callback_data: 'settings:thinking_mode' }
+        ],
+        [
+          { text: '🔗 Always-On Concat Mode', callback_data: 'settings:concat_always_on' }
+        ],
+        [
           { text: '🎤 Voice Transcription Method', callback_data: 'settings:voice_transcription' }
         ],
         [
@@ -161,6 +167,16 @@ class SettingsMenuHandler {
         return true;
       }
 
+      if (callbackData === 'settings:thinking_mode') {
+        await this.showThinkingModeSettings(chatId, messageId);
+        return true;
+      }
+
+      if (callbackData === 'settings:concat_always_on') {
+        await this.showConcatAlwaysOnSettings(chatId, messageId);
+        return true;
+      }
+
       if (callbackData === 'settings:activitywatch') {
         await this.showActivityWatchSettings(chatId, messageId);
         return true;
@@ -205,6 +221,80 @@ class SettingsMenuHandler {
           await this.bot.safeEditMessage(chatId, messageId,
             '❌ *Settings Error*\n\n' +
               `Failed to update Voice Auto Send setting: ${error.message}`
+          );
+        }
+        return true;
+      }
+
+      if (callbackData.startsWith('settings:thinking:')) {
+        const thinkingMode = callbackData.replace('settings:thinking:', '');
+        
+        try {
+          const userId = this.bot.getUserIdFromChat(chatId);
+          this.bot.storeUserThinkingMode(userId, thinkingMode);
+          
+          const modeDisplay = this.bot.thinkingModes.find(mode => mode.id === thinkingMode)?.name || thinkingMode;
+          
+          await this.bot.safeEditMessage(chatId, messageId,
+            '✅ *Thinking Mode Updated*\n\n' +
+              `New thinking mode: **${modeDisplay}**\n\n` +
+              'This mode will be used for all future AI conversations.'
+          );
+        } catch (error) {
+          await this.bot.safeEditMessage(chatId, messageId,
+            '❌ *Settings Error*\n\n' +
+              `Failed to update thinking mode: ${error.message}`
+          );
+        }
+        return true;
+      }
+
+      if (callbackData.startsWith('settings:concat_always:')) {
+        const action = callbackData.replace('settings:concat_always:', '');
+        const enabled = action === 'enable';
+        
+        try {
+          const userId = this.bot.getUserIdFromChat(chatId);
+          this.setConcatAlwaysOnMode(enabled);
+          
+          // If enabling, immediately activate concat mode for this user
+          if (enabled) {
+            this.bot.initializeConcatModeOnStartup(userId);
+            console.log(`🔗 [Settings] Immediately enabled concat mode for user ${userId}`);
+          } else {
+            // If disabling, turn off concat mode for this user
+            if (this.bot.concatMode && this.bot.concatMode.has(userId)) {
+              this.bot.concatMode.set(userId, false);
+              if (this.bot.messageBuffer && this.bot.messageBuffer.has(userId)) {
+                this.bot.messageBuffer.get(userId).length = 0; // Clear buffer
+              }
+              console.log(`🔗 [Settings] Disabled concat mode for user ${userId}`);
+            }
+          }
+          
+          await this.bot.safeEditMessage(chatId, messageId,
+            '✅ *Concat Settings Updated*\n\n' +
+              `Always-On Concat Mode: **${enabled ? 'Enabled' : 'Disabled'}**\n\n` +
+              (enabled ? 
+                '🔗 Concat mode is now active! Your keyboard has been updated.' :
+                '❌ Concat mode disabled. Your keyboard has been updated.') +
+              '\n\nSend any message to see the updated keyboard.'
+          );
+          
+          // Force keyboard update by sending a new message with fresh keyboard
+          setTimeout(async () => {
+            await this.bot.safeSendMessage(chatId, 
+              '🔄 *Keyboard Updated*\n\nConcat mode setting applied successfully.',
+              { 
+                reply_markup: this.bot.keyboardHandlers.getReplyKeyboardMarkup(userId)
+              }
+            );
+          }, 1000);
+          
+        } catch (error) {
+          await this.bot.safeEditMessage(chatId, messageId,
+            '❌ *Settings Error*\n\n' +
+              `Failed to update Always-On Concat setting: ${error.message}`
           );
         }
         return true;
@@ -283,6 +373,141 @@ class SettingsMenuHandler {
     } catch (error) {
       console.error('[SettingsHandler] Callback error:', error);
       return false;
+    }
+  }
+
+  /**
+   * Show thinking mode settings menu
+   */
+  async showThinkingModeSettings(chatId, messageId = null) {
+    try {
+      const userId = this.bot.getUserIdFromChat(chatId);
+      const currentMode = this.bot.getUserThinkingMode(userId);
+      
+      const keyboard = {
+        inline_keyboard: []
+      };
+
+      // Add thinking mode buttons in pairs like the original implementation
+      for (let i = 0; i < this.bot.thinkingModes.length; i += 2) {
+        const mode1 = this.bot.thinkingModes[i];
+        const row = [
+          {
+            text: currentMode === mode1.id ? `● ${mode1.name}` : `○ ${mode1.name}`,
+            callback_data: `settings:thinking:${mode1.id}`
+          }
+        ];
+        
+        if (i + 1 < this.bot.thinkingModes.length) {
+          const mode2 = this.bot.thinkingModes[i + 1];
+          row.push({
+            text: currentMode === mode2.id ? `● ${mode2.name}` : `○ ${mode2.name}`,
+            callback_data: `settings:thinking:${mode2.id}`
+          });
+        }
+        keyboard.inline_keyboard.push(row);
+      }
+
+      keyboard.inline_keyboard.push([
+        { text: '🔙 Back to Settings', callback_data: 'settings:back' }
+      ]);
+
+      const message = '🧠 *Thinking Mode Selection*\n\n' +
+        `**Current mode:** ${this.bot.thinkingModes.find(mode => mode.id === currentMode)?.name || 'Standard'}\n\n` +
+        '**Available thinking modes:**\n' +
+        `${this.bot.thinkingModes.map(mode =>
+          `${currentMode === mode.id ? '●' : '○'} **${mode.name}** - ${mode.description}`
+        ).join('\n')}\n\n` +
+        '💡 Select thinking mode for Claude:';
+
+      if (messageId) {
+        await this.bot.safeEditMessage(chatId, messageId, message, { reply_markup: keyboard });
+      } else {
+        await this.bot.safeSendMessage(chatId, message, { reply_markup: keyboard });
+      }
+    } catch (error) {
+      console.error('[SettingsHandler] Error showing thinking mode settings:', error);
+      
+      const errorMessage = '❌ *Error*\n\nFailed to load thinking mode settings.';
+      
+      if (messageId) {
+        await this.bot.safeEditMessage(chatId, messageId, errorMessage);
+      } else {
+        await this.bot.safeSendMessage(chatId, errorMessage);
+      }
+    }
+  }
+
+  /**
+   * Show concat always-on settings menu
+   */
+  async showConcatAlwaysOnSettings(chatId, messageId = null) {
+    const isEnabled = this.getConcatAlwaysOnMode();
+    
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { 
+            text: isEnabled ? '✅ Enabled (Current)' : '✅ Enable',
+            callback_data: 'settings:concat_always:enable'
+          }
+        ],
+        [
+          { 
+            text: isEnabled ? '❌ Disable' : '❌ Disabled (Current)',
+            callback_data: 'settings:concat_always:disable'
+          }
+        ],
+        [
+          { text: '🔙 Back to Settings', callback_data: 'settings:back' }
+        ]
+      ]
+    };
+
+    const message = '🔗 *Always-On Concat Mode*\n\n' +
+                   `Current status: **${isEnabled ? 'Enabled' : 'Disabled'}**\n\n` +
+                   '**When enabled:**\n' +
+                   '• Concat mode is automatically active on bot startup\n' +
+                   '• New sessions start with concat mode enabled\n' +
+                   '• Bot remembers this setting between restarts\n\n' +
+                   '**When disabled:**\n' +
+                   '• Concat mode starts off by default\n' +
+                   '• Must manually enable concat mode each session\n' +
+                   '• Traditional behavior';
+
+    if (messageId) {
+      await this.bot.safeEditMessage(chatId, messageId, message, { reply_markup: keyboard });
+    } else {
+      await this.bot.safeSendMessage(chatId, message, { reply_markup: keyboard });
+    }
+  }
+
+  /**
+   * Get concat always-on mode setting from config
+   */
+  getConcatAlwaysOnMode() {
+    try {
+      return this.bot.configManager?.getConfig()?.concatAlwaysOn || false;
+    } catch (error) {
+      console.error('[SettingsHandler] Error getting concat always-on mode:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Set concat always-on mode setting in config
+   */
+  setConcatAlwaysOnMode(enabled) {
+    try {
+      if (this.bot.configManager) {
+        this.bot.configManager.setConcatAlwaysOn(enabled);
+        console.log(`[SettingsHandler] Set concat always-on mode: ${enabled}`);
+      } else {
+        throw new Error('ConfigManager not available');
+      }
+    } catch (error) {
+      console.error('[SettingsHandler] Error setting concat always-on mode:', error);
+      throw error;
     }
   }
 

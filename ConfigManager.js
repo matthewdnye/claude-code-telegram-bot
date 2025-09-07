@@ -224,6 +224,20 @@ class ConfigManager {
     }
 
     /**
+     * Get concat always-on mode state
+     */
+    getConcatAlwaysOn() {
+        return this.get('concatAlwaysOn', false);
+    }
+
+    /**
+     * Set concat always-on mode state
+     */
+    setConcatAlwaysOn(enabled) {
+        this.set('concatAlwaysOn', enabled);
+    }
+
+    /**
      * Persist current in-memory config to disk
      * Only called when config actually changes
      */

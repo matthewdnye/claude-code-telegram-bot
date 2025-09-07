@@ -1136,6 +1136,9 @@ class SessionManager {
     const session = await this.createUserSession(userId, chatId);
     await this.mainBot.sendSessionInit(chatId, session);
     
+    // Auto-enable concat mode if always-on is configured
+    this.mainBot.initializeConcatModeOnStartup(userId);
+    
     const path = require('path');
     await this.mainBot.safeSendMessage(chatId, 
       '🆕 **New session started**\n\n' +

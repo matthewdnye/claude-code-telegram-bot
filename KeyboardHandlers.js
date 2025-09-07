@@ -37,7 +37,6 @@ class KeyboardHandlers {
           { text: '⚡ Commands' }
         ],
         [
-          { text: '🧠 Thinking' },
           { text: '📍 Path' },
           { text: '📁 Git' },
           { text: '🌐 Web App' }
@@ -122,10 +121,6 @@ class KeyboardHandlers {
       await this.mainBot.commandsHandler.showCommandsMenu(chatId);
       return true;
         
-    case '🧠 Thinking':
-      console.log(`[COMPONENT] StreamTelegramBot.showThinkingModeSelection - chatId: ${chatId}`);
-      await this.mainBot.showThinkingModeSelection(chatId);
-      return true;
         
     case '📁 Git':
       logKeyboardButton();

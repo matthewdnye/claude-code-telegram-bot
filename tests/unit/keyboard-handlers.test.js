@@ -35,7 +35,9 @@ const createMockMainBot = () => ({
   getConcatModeStatus: jest.fn().mockReturnValue(false),
   enableConcatMode: jest.fn().mockResolvedValue(),
   disableConcatMode: jest.fn().mockResolvedValue(),
-  sendConcatenatedMessage: jest.fn().mockResolvedValue()
+  sendConcatenatedMessage: jest.fn().mockResolvedValue(),
+  // Web App functionality
+  handleFilesCommand: jest.fn().mockResolvedValue()
 });
 
 const createMockMessage = (text, overrides = {}) => ({
@@ -81,9 +83,9 @@ describe('KeyboardHandlers', () => {
             { text: '⚡ Commands' }
           ],
           [
-            { text: '🧠 Thinking' },
             { text: '📍 Path' },
-            { text: '📁 Git' }
+            { text: '📁 Git' },
+            { text: '🌐 Web App' }
           ],
           [
             { text: '⚙️ Settings' },
@@ -225,13 +227,13 @@ describe('KeyboardHandlers', () => {
       expect(mockMainBot.commandsHandler.showCommandsMenu).toHaveBeenCalledWith(123);
     });
 
-    test('should handle Thinking button', async () => {
-      const msg = createMockMessage('🧠 Thinking');
+    test('should handle Web App button', async () => {
+      const msg = createMockMessage('🌐 Web App');
 
       const result = await keyboardHandlers.handleKeyboardButton(msg);
 
       expect(result).toBe(true);
-      expect(mockMainBot.showThinkingModeSelection).toHaveBeenCalledWith(123);
+      expect(mockMainBot.handleFilesCommand).toHaveBeenCalledWith(123);
     });
 
     test('should handle Git button', async () => {

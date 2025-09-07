@@ -1526,6 +1526,61 @@ class StreamTelegramBot {
   }
 
   /**
+   * Initialize concat mode on startup if always-on is configured
+   */
+  initializeConcatModeOnStartup(userId = null) {
+    try {
+      const concatAlwaysOn = this.configManager?.getConcatAlwaysOn() || false;
+      console.log(`🔗 [Startup] Checking concat always-on setting: ${concatAlwaysOn}, userId: ${userId}`);
+      
+      if (concatAlwaysOn) {
+        // Initialize maps if they don't exist (use correct variable names)
+        if (!this.concatMode) {
+          this.concatMode = new Map();
+          console.log(`🔗 [Startup] Created concatMode Map`);
+        }
+        if (!this.messageBuffer) {
+          this.messageBuffer = new Map();
+          console.log(`🔗 [Startup] Created messageBuffer Map`);
+        }
+        
+        if (userId) {
+          // Enable concat mode for specific user
+          this.concatMode.set(userId, true);
+          this.messageBuffer.set(userId, []);
+          
+          console.log(`🔗 [Startup] Auto-enabled concat mode for user ${userId}`);
+          console.log(`🔗 [Debug] ConcatMode size: ${this.concatMode.size}, userId ${userId} enabled: ${this.concatMode.get(userId)}`);
+        } else {
+          // Initialize for all authorized users when no specific user
+          console.log(`🔗 [Startup] No specific userId, checking authorized users`);
+          console.log(`🔗 [Startup] adminUserId: ${this.adminUserId}, authorizedUsers size: ${this.authorizedUsers?.size}`);
+          
+          if (this.authorizedUsers && this.authorizedUsers.size > 0) {
+            for (const adminUserId of this.authorizedUsers) {
+              this.concatMode.set(adminUserId, true);
+              this.messageBuffer.set(adminUserId, []);
+              console.log(`🔗 [Startup] Auto-enabled concat mode for authorized user ${adminUserId}`);
+            }
+            console.log(`🔗 [Debug] Total concat modes enabled: ${this.concatMode.size}`);
+          } else if (this.adminUserId) {
+            // Fallback to single admin user
+            this.concatMode.set(this.adminUserId, true);
+            this.messageBuffer.set(this.adminUserId, []);
+            console.log(`🔗 [Startup] Auto-enabled concat mode for admin user ${this.adminUserId}`);
+          } else {
+            console.log(`🔗 [Startup] No authorized users found`);
+          }
+        }
+      } else {
+        console.log('🔗 [Startup] Concat always-on mode disabled');
+      }
+    } catch (error) {
+      console.error('[Startup] Error initializing concat mode:', error.message);
+    }
+  }
+
+  /**
    * Restore last session on bot startup
    */
   async restoreLastSessionOnStartup() {
@@ -1556,8 +1611,14 @@ class StreamTelegramBot {
         console.log(`🔄 [Startup] Restored last session ${sessionId.slice(-8)} for user ${userId}`);
         console.log(`📁 [Startup] Working directory: ${this.options.workingDirectory}`);
         console.log(`🤖 [Startup] Model: ${this.options.model}`);
+        
+        // Auto-enable concat mode if always-on is configured
+        this.initializeConcatModeOnStartup(userId);
       } else {
         console.log('💡 [Startup] No previous session found in config');
+        
+        // Still check for concat always-on mode even without previous session
+        this.initializeConcatModeOnStartup();
       }
     } catch (error) {
       console.error('⚠️ [Startup] Failed to restore last session:', error.message);
@@ -1873,7 +1934,12 @@ class StreamTelegramBot {
    * Get concat mode status for a user
    */
   getConcatModeStatus(userId) {
-    return this.concatMode.get(userId) || false;
+    const status = this.concatMode?.get(userId) || false;
+    // Only log when concat mode is enabled or when debugging is needed
+    if (status) {
+      console.log(`🔗 [Debug] getConcatModeStatus for userId ${userId}: ${status}`);
+    }
+    return status;
   }
 
   /**
