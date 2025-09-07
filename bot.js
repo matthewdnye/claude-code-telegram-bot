@@ -1537,11 +1537,11 @@ class StreamTelegramBot {
         // Initialize maps if they don't exist (use correct variable names)
         if (!this.concatMode) {
           this.concatMode = new Map();
-          console.log(`🔗 [Startup] Created concatMode Map`);
+          console.log('🔗 [Startup] Created concatMode Map');
         }
         if (!this.messageBuffer) {
           this.messageBuffer = new Map();
-          console.log(`🔗 [Startup] Created messageBuffer Map`);
+          console.log('🔗 [Startup] Created messageBuffer Map');
         }
         
         if (userId) {
@@ -1553,7 +1553,7 @@ class StreamTelegramBot {
           console.log(`🔗 [Debug] ConcatMode size: ${this.concatMode.size}, userId ${userId} enabled: ${this.concatMode.get(userId)}`);
         } else {
           // Initialize for all authorized users when no specific user
-          console.log(`🔗 [Startup] No specific userId, checking authorized users`);
+          console.log('🔗 [Startup] No specific userId, checking authorized users');
           console.log(`🔗 [Startup] adminUserId: ${this.adminUserId}, authorizedUsers size: ${this.authorizedUsers?.size}`);
           
           if (this.authorizedUsers && this.authorizedUsers.size > 0) {
@@ -1569,7 +1569,7 @@ class StreamTelegramBot {
             this.messageBuffer.set(this.adminUserId, []);
             console.log(`🔗 [Startup] Auto-enabled concat mode for admin user ${this.adminUserId}`);
           } else {
-            console.log(`🔗 [Startup] No authorized users found`);
+            console.log('🔗 [Startup] No authorized users found');
           }
         }
       } else {
@@ -1843,22 +1843,32 @@ class StreamTelegramBot {
     this.sessionManager.startSessionTiming(userId, finalText);
 
     try {
-      // Check if we have a stored session ID to resume
-      const sessionId = this.getStoredSessionId(userId);
-      console.log(`[ProcessUserMessage] Stored session ID for user ${userId}: ${sessionId ? sessionId.slice(-8) : 'none'}`);
+      // Check if Always New Session Mode is enabled
+      const alwaysNewSession = this.configManager?.getAlwaysNewSession() || false;
+      console.log(`[ProcessUserMessage] Always New Session Mode: ${alwaysNewSession}`);
       
-      if (sessionId) {
-        // Resume existing session with -r flag
-        console.log(`[ProcessUserMessage] Resuming session for user ${userId}: ${sessionId.slice(-8)}`);
-        await session.processor.resumeSession(sessionId, finalText);
-      } else if (session.messageCount === 0) {
-        // First message - start new conversation
-        console.log(`[ProcessUserMessage] Starting new conversation for user ${userId} (message count: ${session.messageCount})`);
+      if (alwaysNewSession) {
+        // Always start a new conversation when this mode is enabled
+        console.log(`[ProcessUserMessage] Always New Session Mode enabled - starting fresh conversation for user ${userId}`);
         await session.processor.startNewConversation(finalText);
       } else {
-        // Continue conversation with -c flag (fallback)
-        console.log(`[ProcessUserMessage] Continuing conversation for user ${userId} (message count: ${session.messageCount})`);
-        await session.processor.continueConversation(finalText);
+        // Original logic - check if we have a stored session ID to resume
+        const sessionId = this.getStoredSessionId(userId);
+        console.log(`[ProcessUserMessage] Stored session ID for user ${userId}: ${sessionId ? sessionId.slice(-8) : 'none'}`);
+        
+        if (sessionId) {
+          // Resume existing session with -r flag
+          console.log(`[ProcessUserMessage] Resuming session for user ${userId}: ${sessionId.slice(-8)}`);
+          await session.processor.resumeSession(sessionId, finalText);
+        } else if (session.messageCount === 0) {
+          // First message - start new conversation
+          console.log(`[ProcessUserMessage] Starting new conversation for user ${userId} (message count: ${session.messageCount})`);
+          await session.processor.startNewConversation(finalText);
+        } else {
+          // Continue conversation with -c flag (fallback)
+          console.log(`[ProcessUserMessage] Continuing conversation for user ${userId} (message count: ${session.messageCount})`);
+          await session.processor.continueConversation(finalText);
+        }
       }
       
       session.messageCount++;
@@ -2175,7 +2185,7 @@ class StreamTelegramBot {
       // Get secure URL with token for external access
       this.webServerUrl = this.unifiedWebServer.getSecurePublicUrl();
       console.log(`✅ Unified web server available at: ${this.webServerUrl}`);
-      console.log(`🔐 URL includes security token for protected access`);
+      console.log('🔐 URL includes security token for protected access');
       return this.webServerUrl;
     } catch (error) {
       console.error('Failed to start unified web server:', error);
@@ -2220,10 +2230,10 @@ class StreamTelegramBot {
       // secureUrl already contains the security token from startUnifiedWebServer
       
       const ngrokTip = isLocalOnly ? 
-        `🔧 **Setup Remote Access:** Set NGROK_AUTHTOKEN environment variable` : 
-        `💡 **Tip:** Add header \`ngrok-skip-browser-warning: true\` to bypass ngrok warning banner`;
+        '🔧 **Setup Remote Access:** Set NGROK_AUTHTOKEN environment variable' : 
+        '💡 **Tip:** Add header `ngrok-skip-browser-warning: true` to bypass ngrok warning banner';
       
-      const message = `🌐 **Web App Available**\n\n` +
+      const message = '🌐 **Web App Available**\n\n' +
         `🔗 Access URL:\n${secureUrl}`;
 
       const keyboard = {
@@ -2250,83 +2260,83 @@ class StreamTelegramBot {
 
     try {
       switch (action) {
-        case 'stop':
-          await this.stopUnifiedWebServer();
+      case 'stop':
+        await this.stopUnifiedWebServer();
+        await this.bot.editMessageText(
+          '✅ Dev tools server stopped',
+          {
+            chat_id: chatId,
+            message_id: query.message.message_id,
+            reply_markup: {
+              inline_keyboard: [[
+                { text: '🔄 Restart', callback_data: 'files:start' }
+              ]]
+            }
+          }
+        );
+        break;
+
+      case 'start':
+        await this.startUnifiedWebServer();
+        const secureUrl = this.unifiedWebServer.getSecurePublicUrl() || this.webServerUrl;
+        const isUrlLocalOnly = secureUrl && secureUrl.includes('localhost');
+        const accessType = isUrlLocalOnly ? '🏠 Local Access Only' : '🌐 Public Access Available';
+        const statusIcon = isUrlLocalOnly ? '🏠' : '🌐';
+          
+        const message = '🌐 **Web App Available**\n\n' +
+            `🔗 Access URL:\n${secureUrl}`;
+          
+        const replyMarkup = {
+          inline_keyboard: [
+            [{ text: '🌐 Open Web App', web_app: { url: secureUrl } }]
+          ]
+        };
+            
+        await this.bot.editMessageText(message, {
+          chat_id: chatId,
+          message_id: query.message.message_id,
+          parse_mode: 'Markdown',
+          reply_markup: replyMarkup
+        });
+        break;
+
+      case 'refresh':
+        if (this.webServerUrl) {
+          const secureRefreshUrl = this.unifiedWebServer.getSecurePublicUrl() || this.webServerUrl;
+          const isRefreshLocalOnly = this.webServerUrl.includes('localhost');
+          const refreshAccessType = isRefreshLocalOnly ? '🏠 Local Access Only' : '🌐 Public Access Available';
+          const refreshStatusIcon = isRefreshLocalOnly ? '🏠' : '🌐';
+            
+          const refreshMessage = '🌐 **Web App Available**\n\n' +
+              `🔗 Access URL:\n${secureRefreshUrl}`;
+            
+          const refreshReplyMarkup = {
+            inline_keyboard: [
+              [{ text: '🌐 Open Web App', web_app: { url: secureRefreshUrl } }]
+            ]
+          };
+              
+          await this.bot.editMessageText(refreshMessage, {
+            chat_id: chatId,
+            message_id: query.message.message_id,
+            parse_mode: 'Markdown',
+            reply_markup: refreshReplyMarkup
+          });
+        } else {
           await this.bot.editMessageText(
-            '✅ Dev tools server stopped',
+            '⚠️ File browser is not running. Start it first.',
             {
               chat_id: chatId,
               message_id: query.message.message_id,
               reply_markup: {
                 inline_keyboard: [[
-                  { text: '🔄 Restart', callback_data: 'files:start' }
+                  { text: '🔄 Start Server', callback_data: 'files:start' }
                 ]]
               }
             }
           );
-          break;
-
-        case 'start':
-          await this.startUnifiedWebServer();
-          const secureUrl = this.unifiedWebServer.getSecurePublicUrl() || this.webServerUrl;
-          const isUrlLocalOnly = secureUrl && secureUrl.includes('localhost');
-          const accessType = isUrlLocalOnly ? '🏠 Local Access Only' : '🌐 Public Access Available';
-          const statusIcon = isUrlLocalOnly ? '🏠' : '🌐';
-          
-          const message = `🌐 **Web App Available**\n\n` +
-            `🔗 Access URL:\n${secureUrl}`;
-          
-          const replyMarkup = {
-            inline_keyboard: [
-              [{ text: '🌐 Open Web App', web_app: { url: secureUrl } }]
-            ]
-          };
-            
-          await this.bot.editMessageText(message, {
-            chat_id: chatId,
-            message_id: query.message.message_id,
-            parse_mode: 'Markdown',
-            reply_markup: replyMarkup
-          });
-          break;
-
-        case 'refresh':
-          if (this.webServerUrl) {
-            const secureRefreshUrl = this.unifiedWebServer.getSecurePublicUrl() || this.webServerUrl;
-            const isRefreshLocalOnly = this.webServerUrl.includes('localhost');
-            const refreshAccessType = isRefreshLocalOnly ? '🏠 Local Access Only' : '🌐 Public Access Available';
-            const refreshStatusIcon = isRefreshLocalOnly ? '🏠' : '🌐';
-            
-            const refreshMessage = `🌐 **Web App Available**\n\n` +
-              `🔗 Access URL:\n${secureRefreshUrl}`;
-            
-            const refreshReplyMarkup = {
-              inline_keyboard: [
-                [{ text: '🌐 Open Web App', web_app: { url: secureRefreshUrl } }]
-              ]
-            };
-              
-            await this.bot.editMessageText(refreshMessage, {
-              chat_id: chatId,
-              message_id: query.message.message_id,
-              parse_mode: 'Markdown',
-              reply_markup: refreshReplyMarkup
-            });
-          } else {
-            await this.bot.editMessageText(
-              '⚠️ File browser is not running. Start it first.',
-              {
-                chat_id: chatId,
-                message_id: query.message.message_id,
-                reply_markup: {
-                  inline_keyboard: [[
-                    { text: '🔄 Start Server', callback_data: 'files:start' }
-                  ]]
-                }
-              }
-            );
-          }
-          break;
+        }
+        break;
       }
 
       await this.bot.answerCallbackQuery(query.id);
@@ -2433,11 +2443,11 @@ class StreamTelegramBot {
       const isServerRunning = this.webServerUrl && !this.webServerUrl.includes('localhost');
       const serverStatus = isServerRunning ? '🌐 Web server running' : '🏠 Local access only';
       
-      const message = `🎯 **Main Menu**\n\n` +
+      const message = '🎯 **Main Menu**\n\n' +
         `${serverStatus}\n` +
         `📍 **Current Project:** ${path.basename(this.options.workingDirectory)}\n` +
         `🤖 **Model:** ${this.getModelDisplayName(this.options.model)}\n\n` +
-        `💡 Choose an option from the menu below:`;
+        '💡 Choose an option from the menu below:';
 
       const keyboard = this.createMainMenuKeyboard(!isServerRunning);
 
@@ -2458,41 +2468,41 @@ class StreamTelegramBot {
     
     try {
       switch (action) {
-        case 'files':
-          await this.handleFilesCommand(chatId);
-          break;
-        case 'projects':
-          await this.projectNavigator.showProjectSelection(chatId);
-          break;
-        case 'git':
-          await this.gitManager.showGitOverview(chatId);
-          break;
-        case 'status':
-          await this.sessionManager.showSessionStatus(chatId);
-          break;
-        case 'new_session':
-          await this.sessionManager.startNewSession(chatId);
-          break;
-        case 'sessions':
-          await this.sessionManager.showSessionHistory(chatId);
-          break;
-        case 'model':
-          await this.showModelSelection(chatId);
-          break;
-        case 'thinking':
-          await this.showThinkingModeSelection(chatId);
-          break;
-        case 'settings':
-          await this.settingsHandler.showSettingsMenu(chatId);
-          break;
-        case 'pwd':
-          await this.showCurrentDirectory(chatId, userId);
-          break;
-        case 'commands':
-          await this.commandsHandler.showCommandsMenu(chatId, messageId);
-          break;
-        default:
-          console.log(`[MainMenu] Unknown action: ${action}`);
+      case 'files':
+        await this.handleFilesCommand(chatId);
+        break;
+      case 'projects':
+        await this.projectNavigator.showProjectSelection(chatId);
+        break;
+      case 'git':
+        await this.gitManager.showGitOverview(chatId);
+        break;
+      case 'status':
+        await this.sessionManager.showSessionStatus(chatId);
+        break;
+      case 'new_session':
+        await this.sessionManager.startNewSession(chatId);
+        break;
+      case 'sessions':
+        await this.sessionManager.showSessionHistory(chatId);
+        break;
+      case 'model':
+        await this.showModelSelection(chatId);
+        break;
+      case 'thinking':
+        await this.showThinkingModeSelection(chatId);
+        break;
+      case 'settings':
+        await this.settingsHandler.showSettingsMenu(chatId);
+        break;
+      case 'pwd':
+        await this.showCurrentDirectory(chatId, userId);
+        break;
+      case 'commands':
+        await this.commandsHandler.showCommandsMenu(chatId, messageId);
+        break;
+      default:
+        console.log(`[MainMenu] Unknown action: ${action}`);
       }
     } catch (error) {
       console.error(`[MainMenu] Error handling ${action}:`, error);
@@ -2514,14 +2524,14 @@ class StreamTelegramBot {
       const secureUrl = this.unifiedWebServer.getSecurePublicUrl() || this.webServerUrl;
       
       const message = `${statusIcon} **${this.botInstanceName.toUpperCase()} - Dev Tools Ready**\n\n` +
-        `🌐 Web server started successfully!\n` +
+        '🌐 Web server started successfully!\n' +
         `🔗 Secure URL: ${secureUrl}\n` +
         `📍 Access: ${accessType}\n\n` +
-        `🎯 **Available Services:**\n` +
-        `• File browser and project explorer\n` +
-        `• Git diff viewer with syntax highlighting\n` +
-        `• Unified development tools interface\n\n` +
-        `💡 Use the menu below to access all features` +
+        '🎯 **Available Services:**\n' +
+        '• File browser and project explorer\n' +
+        '• Git diff viewer with syntax highlighting\n' +
+        '• Unified development tools interface\n\n' +
+        '💡 Use the menu below to access all features' +
         (isLocalOnly ? '\n\n🔧 Set NGROK_AUTHTOKEN for remote access' : '');
 
       const messageOptions = {

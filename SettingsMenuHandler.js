@@ -24,6 +24,9 @@ class SettingsMenuHandler {
           { text: '🔗 Always-On Concat Mode', callback_data: 'settings:concat_always_on' }
         ],
         [
+          { text: '🆕 Always New Session Mode', callback_data: 'settings:always_new_session' }
+        ],
+        [
           { text: '🎤 Voice Transcription Method', callback_data: 'settings:voice_transcription' }
         ],
         [
@@ -177,6 +180,11 @@ class SettingsMenuHandler {
         return true;
       }
 
+      if (callbackData === 'settings:always_new_session') {
+        await this.showAlwaysNewSessionSettings(chatId, messageId);
+        return true;
+      }
+
       if (callbackData === 'settings:activitywatch') {
         await this.showActivityWatchSettings(chatId, messageId);
         return true;
@@ -295,6 +303,29 @@ class SettingsMenuHandler {
           await this.bot.safeEditMessage(chatId, messageId,
             '❌ *Settings Error*\n\n' +
               `Failed to update Always-On Concat setting: ${error.message}`
+          );
+        }
+        return true;
+      }
+
+      if (callbackData.startsWith('settings:new_session:')) {
+        const action = callbackData.replace('settings:new_session:', '');
+        const enabled = action === 'enable';
+        
+        try {
+          this.setAlwaysNewSessionMode(enabled);
+          
+          await this.bot.safeEditMessage(chatId, messageId,
+            '✅ *Session Settings Updated*\n\n' +
+              `Always New Session Mode: **${enabled ? 'Enabled' : 'Disabled'}**\n\n` +
+              (enabled ? 
+                '🆕 Every message will now start a fresh session.' :
+                '🔄 Session resuming is now enabled (default behavior).')
+          );
+        } catch (error) {
+          await this.bot.safeEditMessage(chatId, messageId,
+            '❌ *Settings Error*\n\n' +
+              `Failed to update Always New Session setting: ${error.message}`
           );
         }
         return true;
@@ -507,6 +538,79 @@ class SettingsMenuHandler {
       }
     } catch (error) {
       console.error('[SettingsHandler] Error setting concat always-on mode:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Show always new session settings menu
+   */
+  async showAlwaysNewSessionSettings(chatId, messageId = null) {
+    const isEnabled = this.getAlwaysNewSessionMode();
+    
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { 
+            text: isEnabled ? '✅ Enabled (Current)' : '✅ Enable',
+            callback_data: 'settings:new_session:enable'
+          }
+        ],
+        [
+          { 
+            text: isEnabled ? '❌ Disable' : '❌ Disabled (Current)',
+            callback_data: 'settings:new_session:disable'
+          }
+        ],
+        [
+          { text: '🔙 Back to Settings', callback_data: 'settings:back' }
+        ]
+      ]
+    };
+
+    const message = '🆕 *Always New Session Mode*\n\n' +
+                   `Current status: **${isEnabled ? 'Enabled' : 'Disabled'}**\n\n` +
+                   '**When enabled:**\n' +
+                   '• Every message starts a completely fresh session\n' +
+                   '• No conversation history is carried over\n' +
+                   '• Each interaction is independent\n\n' +
+                   '**When disabled:**\n' +
+                   '• Messages continue existing sessions when available\n' +
+                   '• Conversation history is maintained\n' +
+                   '• Traditional chat-like behavior';
+
+    if (messageId) {
+      await this.bot.safeEditMessage(chatId, messageId, message, { reply_markup: keyboard });
+    } else {
+      await this.bot.safeSendMessage(chatId, message, { reply_markup: keyboard });
+    }
+  }
+
+  /**
+   * Get always new session mode setting from config
+   */
+  getAlwaysNewSessionMode() {
+    try {
+      return this.bot.configManager?.getConfig()?.alwaysNewSession || false;
+    } catch (error) {
+      console.error('[SettingsHandler] Error getting always new session mode:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Set always new session mode setting in config
+   */
+  setAlwaysNewSessionMode(enabled) {
+    try {
+      if (this.bot.configManager) {
+        this.bot.configManager.setAlwaysNewSession(enabled);
+        console.log(`[SettingsHandler] Set always new session mode: ${enabled}`);
+      } else {
+        throw new Error('ConfigManager not available');
+      }
+    } catch (error) {
+      console.error('[SettingsHandler] Error setting always new session mode:', error);
       throw error;
     }
   }
