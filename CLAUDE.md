@@ -224,6 +224,36 @@ After significant implementation, check if CLAUDE.md needs updates:
 
 **⚠️ IMPORTANT:** do not do bot restart, only ask human to do that manually
 
+### 🤖 Claude Code SDK Integration
+
+**Full Documentation**: See `docs/claude-code-sdk-integration.md` for comprehensive usage guide
+
+**What it is**: Programmatic access to Claude Code functionality through a clean, async JavaScript API. Enables building advanced plugin systems and background AI processing without CLI dependencies.
+
+**Key Components:**
+- **`src/utils/ClaudeCodeSDK.js`** - Main SDK wrapper with async/await support
+- **`src/config/claude-models.js`** - Centralized model configuration (easy to update when new models arrive)
+- **`examples/claude-sdk-usage.js`** - Working examples and patterns
+
+**Quick Usage:**
+```javascript
+const ClaudeCodeSDK = require('./src/utils/ClaudeCodeSDK');
+
+const sdk = new ClaudeCodeSDK();
+const response = await sdk.chat('Your prompt here');
+```
+
+**Current Models:**
+- **`claude-sonnet-4-20250514`** - Default (Claude Sonnet 4)
+- **`claude-opus-4-1-20250805`** - Latest Opus
+- Legacy models maintained for backward compatibility
+
+**Authentication**: Uses existing Claude Code credentials automatically (no additional setup required)
+
+**Plugin System Ready**: Designed for planned features like session result audio generation and background image processing
+
+**⚠️ IMPORTANT**: When new Claude models are released, update only `src/config/claude-models.js` - all components will automatically use new models
+
 ## 📝 Git Version Control
 
 ### File Handling Rules
