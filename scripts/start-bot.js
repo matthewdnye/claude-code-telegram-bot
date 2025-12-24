@@ -5,6 +5,13 @@
  * Loads JSON configuration and starts the specified bot instance
  */
 
+// Force OAuth authentication (Claude Max) instead of API credits
+// This ensures the bot never accidentally uses the API key
+if (process.env.ANTHROPIC_API_KEY) {
+  console.log('🔐 Removing ANTHROPIC_API_KEY to force OAuth (Claude Max subscription)');
+  delete process.env.ANTHROPIC_API_KEY;
+}
+
 const path = require('path');
 const fs = require('fs');
 

@@ -1,0 +1,10 @@
+{
+  "botName": "MattBot",
+  "botToken": "YOUR_MATT_BOT_TOKEN_FROM_BOTFATHER",
+  "adminUserId": "",
+  "nexaraApiKey": "",
+  "workingDirectory": "/Users/matthewdnye/Developer",
+  "defaultModel": "opus",
+  "logLevel": "info",
+  "description": "Matt Nye - Personal Claude Interface"
+}

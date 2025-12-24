@@ -1,431 +1,67 @@
-# 🤖 Claude Code Telegram Bot
+---
+aliases:
+  - Telegram Bot
+  - Claude Telegram Interface
+tags:
+  - mcp-server
+  - integration
+  - telegram
+  - claude-code
+created: 2024-12-24
+---
 
-A Node.js Telegram bot that provides remote access to your existing Claude Code installation. Continue your development workflow through Telegram when away from your computer.
+# Claude Code Telegram Bot
 
-## 🔄 How It Works
+Multi-user Telegram interface for Claude Code, enabling virtual employees (like [[06-Virtual-Employees/gwen-ives/README|Gwen Ives]]) and team members to interact with Claude via Telegram.
 
-This bot runs on your development machine and connects to your existing Claude Code instance. It allows you to:
+## Quick Links
 
-- 💬 **Continue coding sessions** remotely through Telegram
-- 🎙️ **Send voice messages** that get transcribed and processed by Claude Code
-- 📱 **Access your projects** and development environment from your phone
-- 🏢 **Manage multiple bot instances** for different projects or clients
+- [[01-MCP-Servers/claude-code-telegram-bot/MULTI-BOT-SETUP|Multi-Bot Setup Guide]]
+- [[01-MCP-Servers/claude-code-telegram-bot/CLAUDE|Claude Code Configuration]]
 
-**⚠️ Important**: This tool doesn't add any AI functionality. It's a bridge that lets you use your existing Claude Code setup through Telegram with some convenience features.
+## Architecture
 
-## 📋 Requirements
-
-### Prerequisites
-- 🔧 **Claude Code CLI** installed and configured on your development machine
-- ⚡ **Node.js** 14+ 
-- 🔑 **Telegram Bot Token** from [@BotFather](https://t.me/botfather)
-- 📂 **Your existing Claude Code projects** and tooling setup
-
-### Optional
-- 🎙️ **Nexara API key** for voice message transcription
-- 🔌 **MCP servers** configured in Claude Code for enhanced functionality
-
-## 📦 Installation
-
-### Development Setup
-```bash
-git clone <repository-url>
-cd claude-code-telegram-control
-npm install
+```
+01-MCP-Servers/claude-code-telegram-bot/
+├── configs/           # Per-user bot configurations
+│   ├── gwen.json      # Gwen Ives bot config
+│   ├── matt.json      # Matt Nye bot config
+│   └── *.json.example # Template configs
+├── .claude/           # Claude Code project settings
+│   └── settings.json  # MCP deny rules (lightweight mode)
+└── bot.js             # Main bot entry point
 ```
 
-### PM2 Production Setup
+## User Configurations
 
-For production deployment with PM2 process manager:
+Each user gets their own config in `configs/`:
 
-#### Prerequisites
-```bash
-# Update system
-sudo apt update
+| User | Config File | Working Directory | Purpose |
+|------|-------------|-------------------|---------|
+| Gwen | `gwen.json` | `06-Virtual-Employees/gwen-ives/workspace` | Virtual COO operations |
+| Matt | `matt.json` | User-defined | Personal Claude interface |
 
-# Install Node.js and npm (if not already installed)
-sudo apt install -y nodejs npm
-
-# Verify installations
-node --version    # Should be 14+
-npm --version
-
-# Install PM2 globally
-npm install -g pm2
-```
-
-#### Setup Process
-```bash
-# 1. Clone and prepare the project
-git clone <repository-url>
-cd claude-code-telegram-control
-npm install
-
-# 2. Configure your bots (create configs/bot1.json, etc.)
-npm run setup   # Interactive setup for each bot
-
-# 3. Install PM2 log rotation
-pm2 install pm2-logrotate
-
-# 4. Start bots with PM2
-pm2 start ecosystem.config.js
-
-# 5. Setup auto-startup on system boot
-pm2 startup
-# Run the command PM2 shows you (requires sudo)
-
-# 6. Save current process list
-pm2 save
-```
-
-PM2 provides:
-- ✅ **Auto-restart** on crash (configurable limits)
-- ✅ **Auto-start** on system boot
-- ✅ **No sudo required** for daily management
-- ✅ **Memory leak protection** (auto-restart on limit)
-- ✅ **Built-in log rotation**
-- ✅ **Real-time monitoring** with `pm2 monit`
-
-## ⚙️ Setup
-
-### ⚡ Quick Setup
-```bash
-npm run setup
-```
-
-The interactive wizard will ask for:
-- 🤖 Bot name and Telegram token
-- 📁 Working directory (where your projects are)
-- 👤 Admin user ID (optional - auto-detected from first message)
-- 🎙️ Nexara API key (optional - for voice messages)
-- 🧠 Default Claude model (Sonnet/Opus)
-
-### 📝 Manual Configuration
-Create configuration files in `configs/` directory:
-
-```json
-// configs/bot1.json
-{
-  "botName": "MyDevBot",
-  "token": "your_telegram_bot_token",
-  "adminUserId": "your_telegram_user_id",
-  "nexaraApiKey": "optional_nexara_key",
-  "workingDirectory": "/path/to/your/projects",
-  "model": "sonnet"
-}
-```
-
-## 🚀 Usage
-
-### ▶️ Starting the Bot
-
-#### Development Mode (Manual)
-```bash
-# Start default bot
-npm run bot1
-
-# Start multiple bots
-npm run bot2
-npm run bot3
-
-# Development mode with auto-restart
-npm run dev
-```
-
-#### Production Mode (PM2 Process Manager)
-For production deployment with PM2 process manager:
+## PM2 Commands
 
 ```bash
+# Start individual bots
+pm2 start ecosystem.config.js --only gwen
+pm2 start ecosystem.config.js --only matt
+
 # Start all bots
 pm2 start ecosystem.config.js
 
-# Management commands (NO SUDO REQUIRED!)
-pm2 restart bot1        # Restart specific bot
-pm2 restart all         # Restart all bots
-pm2 stop bot1          # Stop specific bot
-pm2 start bot1         # Start specific bot
-pm2 delete bot1        # Remove bot from PM2
+# View logs
+pm2 logs gwen
+pm2 logs matt
 
-# Monitoring and logs
-pm2 status             # Show all processes
-pm2 logs               # Show all logs
-pm2 logs bot1          # Show logs for specific bot
-pm2 monit              # Interactive monitoring dashboard
-
-# Updates and maintenance
-git pull               # Update code
-pm2 restart all        # Restart with new code
+# Restart
+pm2 restart gwen
+pm2 restart matt
 ```
 
-PM2 process manager provides:
-- ✅ **Automatic startup** on system boot
-- 🔄 **Auto-restart** on crash (configurable limits)
-- 📋 **Centralized logging** with rotation
-- 🛡️ **Memory leak protection** (512MB restart threshold)
-- 📊 **Real-time monitoring** with `pm2 monit`
-- 🚀 **Zero-downtime deployments**
-- ⚡ **No sudo required** for daily operations
+## Related
 
-### 📝 Basic Commands
-- `/start` - 🎦 Initialize bot and show keyboard
-- `/status` - 📈 Show active Claude Code processes
-- `/new` - ✨ Start new Claude Code session
-- `/sessions` - 📂 Browse previous sessions
-- `/model` - 🧠 Switch Claude model (Sonnet/Opus)
-- `/files` - 🌐 Open web-based file browser with public URL
-- `/cancel` - 🛑 Stop all running processes
-
-### ⌨️ Persistent Keyboard
-Always available buttons:
-```
-🛑 STOP        📊 Status       📂 Projects
-🔄 New Session 📝 Sessions     🤖 Model  
-🧠 Thinking    📍 Path        🔍 Git Diff
-```
-
-### 🎙️ Voice Messages
-If Nexara API is configured:
-1. Send voice message to bot
-2. Bot transcribes speech to text
-3. Shows Execute/Cancel/Edit buttons
-4. Execute sends command to Claude Code
-5. Receive streaming response
-
-## ✨ Features
-
-### 📝 Session Management
-- ⏯️ **Resume conversations** using Claude Code's `--resume` flag
-- 📂 **Session history** with browsable past conversations
-- 🏢 **Multi-instance support** - run separate bots for different projects
-
-### 🔄 Real-time Streaming
-- ⚡ **Live updates** as Claude Code processes commands
-- 🧮 **Smart message chunking** for Telegram's 4096 character limit
-- 📝 **Progressive message editing** to show work in progress
-
-### 🏢 Multi-Bot Configuration
-- 🔄 **Independent instances** with separate configs
-- 📁 **Different working directories** per bot
-- 👥 **Separate admin users** for each bot
-- 🔒 **Isolated session storage**
-
-### 🔄 Git Workflow Management
-- 📊 **Comprehensive git interface** - complete git workflow through Telegram
-- 🌿 **Branch management** - create, switch, list branches with validation
-- 📦 **Staging operations** - stage/unstage files individually or in bulk
-- 📝 **Smart file view** - examine diffs with context-aware staging buttons
-- 📱 **Mobile-optimized UI** - pagination and touch-friendly controls
-- ⚡ **Real-time status** - live git status with ahead/behind tracking
-- 🔄 **Interactive workflows** - guided git operations with error handling
-
-### 🌐 File Browser (Web Interface)
-- 📁 **Web-based file browsing** - navigate project files through a modern web interface
-- 🔗 **Public URL access** - secure ngrok tunnel provides remote access from anywhere
-- 📱 **Mobile-optimized interface** - responsive design perfect for mobile devices
-- 🎨 **Syntax highlighting** - view code files with proper syntax coloring
-- 🔒 **Security-first design** - access restricted to project directory only
-- ⚡ **Auto-lifecycle management** - server starts/stops with bot automatically
-- 💡 **Banner-free access** - automated ngrok warning bypass headers
-
-### 🔒 Security
-- 👤 **Admin-only access** - only configured users can use the bot
-- ✅ **Command confirmation** for voice messages
-- ⏰ **Process timeouts** and emergency stop functionality
-
-## 🏠 Architecture
-
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Telegram      │◄──►│  StreamTelegram │◄──►│  Claude CLI     │
-│   Bot API       │    │  Bot (bot.js)   │    │  Process        │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-                                │
-                                ▼
-                        ┌─────────────────┐
-                        │ ClaudeStream    │
-                        │ Processor +     │
-                        │ TelegramFormat  │
-                        └─────────────────┘
-```
-
-### Key Components
-- 🤖 **bot.js** - Main Telegram bot implementation
-- 🔄 **claude-stream-processor.js** - Claude CLI integration and streaming
-- 📝 **telegram-formatter.js** - Message formatting and chunking
-- 🧼 **telegram-sanitizer.js** - Message sanitization
-
-## 📂 Project Structure
-
-```
-claude-code-telegram-control/
-├── configs/                   # Bot configurations
-│   ├── bot1.json             # Bot instance configs
-│   ├── bot2.json
-│   └── *.json.example        # Example configurations
-├── scripts/                   # Management scripts
-│   ├── start-bot.js          # Bot launcher
-│   └── setup-bot.js          # Interactive setup
-├── bot.js                     # Main bot implementation
-├── claude-stream-processor.js # Claude CLI integration
-├── telegram-formatter.js     # Message formatting
-├── telegram-sanitizer.js     # Message sanitization
-└── package.json              # Dependencies and scripts
-```
-
-## 🔧 Troubleshooting
-
-### ⚠️ Common Issues
-
-**🤖 Bot doesn't respond:**
-- Check Telegram token is valid
-- Verify bot is started with correct config
-- Check admin user ID in config
-
-**🔧 Claude Code integration fails:**
-- Ensure `claude` command works in terminal
-- Check working directory exists and has proper permissions
-- Verify Claude Code is logged in and configured
-
-**🎙️ Voice messages don't work:**
-- Check Nexara API key in config
-- Verify internet connectivity
-- Check Nexara account balance
-
-### 🔍 Debug Commands
-
-#### Development Mode
-```bash
-# Check configured bots
-npm run list-bots
-
-# Test Claude Code connection
-claude --version
-
-# View bot logs
-npm run bot1 # Check console output
-```
-
-#### Production Mode (PM2)
-```bash
-# Check process status
-pm2 status
-
-# View live logs
-pm2 logs bot1 -f
-
-# View recent logs
-pm2 logs bot1 --lines 100
-
-# View all processes logs
-pm2 logs
-
-# Interactive monitoring
-pm2 monit
-
-# Process information
-pm2 info bot1
-```
-
-### 🔄 Using Git Workflow Features
-
-The bot includes a comprehensive Git management interface accessible through Telegram:
-
-#### 📊 Git Overview
-- Send `/start` or click the git button to access the main git interface
-- View current branch, ahead/behind status, file counts
-- Navigate to branches, staging, files, and remote operations
-
-#### 🌿 Branch Management
-- **View branches**: See current branch with ahead/behind tracking
-- **Switch branches**: Safe switching with uncommitted changes handling
-- **Create branches**: Text input with full git validation
-  - Type branch name when prompted
-  - Automatic validation against git naming rules
-  - Conflict detection for existing branches
-
-#### 📦 Staging Operations
-- **Staging overview**: Separate sections for staged/modified/untracked files
-- **Individual file staging**: Stage/unstage specific files from file view
-- **Bulk operations**: Stage All / Unstage All with smart state handling
-- **File selection**: Paginated interfaces for selecting multiple files
-
-#### 📝 File Operations
-- **File browsing**: Navigate through changed files with pagination
-- **Diff viewing**: Examine file changes with configurable context
-- **Smart buttons**: Context-aware staging/unstaging buttons per file
-- **Mobile-optimized**: Touch-friendly interface with clear navigation
-
-#### 🎯 Workflow Tips
-- Use the **📦 Staging** button from any interface for quick access
-- **File view** shows real-time staging status for each file
-- **Error handling** provides helpful guidance for git issues
-- All operations include **confirmation and next steps** guidance
-
-### 🌐 Using File Browser (Web Interface)
-
-The bot includes a modern web-based file browser accessible via public URL:
-
-#### 🚀 Getting Started
-- Send `/files` command to start the file browser server
-- Bot automatically creates a secure ngrok tunnel and provides public URL
-- Click **🌐 Open File Browser** button or copy the URL to any browser
-
-#### 📱 Interface Features
-- **📁 Directory Navigation**: Click folders to navigate through your project
-- **📄 File Viewing**: Click files to view content with syntax highlighting
-- **🧭 Breadcrumb Navigation**: Quick navigation to parent directories
-- **📱 Mobile-Responsive**: Optimized for both desktop and mobile devices
-- **🔒 Secure Access**: Restricted to your project directory only
-
-#### 🛠️ Server Management
-- **🔄 Auto-Start**: Server starts automatically when using `/files` command
-- **❌ Manual Stop**: Use "Stop Server" button to shut down when not needed
-- **🔄 Refresh URL**: Get current URL or restart server if needed
-- **⚡ Auto-Cleanup**: Server automatically stops when bot shuts down
-
-#### 🌍 Remote Access Setup
-To enable remote access, you'll need an ngrok account:
-1. **Sign up** at [ngrok.com](https://ngrok.com) (free tier available)
-2. **Get your auth token** from [ngrok dashboard](https://dashboard.ngrok.com/get-started/your-authtoken)
-3. **Add token to bot config files**:
-   ```json
-   {
-     "botName": "YourBot",
-     "botToken": "...",
-     "ngrokAuthToken": "your_ngrok_token_here"
-   }
-   ```
-4. **Add to all bot configs**: `configs/bot1.json`, `configs/bot2.json`, `configs/bot3.json`, `configs/bot4.json`
-5. **Restart bots** to apply changes: `pm2 restart all`
-
-**Note**: Bot config files are git-ignored, so your ngrok token stays secure.
-
-#### 💡 Bypass Warning Banner
-To skip ngrok's browser warning, add this header to requests:
-```
-ngrok-skip-browser-warning: true
-```
-
-## 👨‍💻 Development
-
-### 🚀 Running in Development Mode
-```bash
-npm run dev  # Uses nodemon for auto-restart
-```
-
-### 🧪 Testing
-```bash
-npm test    # Run test suite
-```
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make changes
-4. Test with your Claude Code setup
-5. Submit a pull request
-
-## 📜 License
-
-MIT License - see LICENSE file for details.
+- [[01-MCP-Servers/README|MCP Servers Overview]]
+- [[06-Virtual-Employees/gwen-ives/README|Gwen Ives Virtual Employee]]
+- [[00-System/README|System Configuration]]

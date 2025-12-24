@@ -1,0 +1,10 @@
+{
+  "botName": "GwenBot",
+  "botToken": "YOUR_GWEN_BOT_TOKEN_FROM_BOTFATHER",
+  "adminUserId": "",
+  "nexaraApiKey": "",
+  "workingDirectory": "/Users/matthewdnye/AIdvisor-Boost/AIdvisor-Boost-System/06-Virtual-Employees/gwen-ives/workspace",
+  "defaultModel": "sonnet",
+  "logLevel": "info",
+  "description": "Gwen Ives - Virtual COO Telegram Interface"
+}
