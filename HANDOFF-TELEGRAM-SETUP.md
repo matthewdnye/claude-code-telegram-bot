@@ -22,7 +22,7 @@
 
 ### Bot Locations
 ```
-01-MCP-Servers/claude-code-telegram-bot/
+~/Developer/claude-code-telegram-bot/
 ├── configs/
 │   ├── gwen.json          # GwenBot config (gitignored - has token)
 │   ├── matt.json          # MattBot config (gitignored - has token)
@@ -46,6 +46,9 @@
 
 ### Starting Bots
 ```bash
+# Navigate to the bot directory first
+cd ~/Developer/claude-code-telegram-bot
+
 # Start both via PM2 (recommended)
 pm2 start ecosystem.config.js
 

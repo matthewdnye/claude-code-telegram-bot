@@ -5,7 +5,7 @@ module.exports = {
       name: 'gwen',
       script: 'scripts/start-bot.js',
       args: 'gwen',
-      cwd: '/Users/matthewdnye/AIdvisor-Boost/AIdvisor-Boost-System/01-MCP-Servers/claude-code-telegram-bot',
+      cwd: '/Users/matthewdnye/Developer/claude-code-telegram-bot',
       env: {
         NODE_ENV: 'production',
         NGROK_AUTHTOKEN: process.env.NGROK_AUTHTOKEN
@@ -27,7 +27,7 @@ module.exports = {
       name: 'matt',
       script: 'scripts/start-bot.js',
       args: 'matt',
-      cwd: '/Users/matthewdnye/AIdvisor-Boost/AIdvisor-Boost-System/01-MCP-Servers/claude-code-telegram-bot',
+      cwd: '/Users/matthewdnye/Developer/claude-code-telegram-bot',
       env: {
         NODE_ENV: 'production',
         NGROK_AUTHTOKEN: process.env.NGROK_AUTHTOKEN
@@ -49,7 +49,7 @@ module.exports = {
       name: 'bot1',
       script: 'scripts/start-bot.js',
       args: 'bot1',
-      cwd: '/Users/matthewdnye/AIdvisor-Boost/AIdvisor-Boost-System/01-MCP-Servers/claude-code-telegram-bot',
+      cwd: '/Users/matthewdnye/Developer/claude-code-telegram-bot',
       env: { NODE_ENV: 'production' },
       autorestart: true,
       watch: false,
@@ -61,7 +61,7 @@ module.exports = {
       name: 'bot2',
       script: 'scripts/start-bot.js',
       args: 'bot2',
-      cwd: '/Users/matthewdnye/AIdvisor-Boost/AIdvisor-Boost-System/01-MCP-Servers/claude-code-telegram-bot',
+      cwd: '/Users/matthewdnye/Developer/claude-code-telegram-bot',
       env: { NODE_ENV: 'production' },
       autorestart: true,
       watch: false,
