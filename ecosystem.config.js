@@ -15,6 +15,7 @@ module.exports = {
       max_memory_restart: '512M',
       max_restarts: 10,
       min_uptime: '10s',
+      cron_restart: '0 4 * * *',  // Auto-restart daily at 4 AM to prevent polling issues
       log_file: 'logs/gwen.log',
       error_file: 'logs/gwen-error.log',
       out_file: 'logs/gwen-out.log',
@@ -37,6 +38,7 @@ module.exports = {
       max_memory_restart: '512M',
       max_restarts: 10,
       min_uptime: '10s',
+      cron_restart: '0 4 * * *',  // Auto-restart daily at 4 AM to prevent polling issues
       log_file: 'logs/matt.log',
       error_file: 'logs/matt-error.log',
       out_file: 'logs/matt-out.log',

@@ -24,6 +24,21 @@ class StreamTelegramBot {
   constructor(token, options = {}) {
     this.bot = new TelegramBot(token, { polling: true });
     this.formatter = new TelegramFormatter();
+
+    // Polling error recovery - exit after too many consecutive failures so PM2 can restart
+    this.consecutivePollingErrors = 0;
+    this.bot.on('polling_error', (error) => {
+      this.consecutivePollingErrors++;
+      console.error(`error: [polling_error] ${JSON.stringify({code: error.code, message: error.message})}`);
+
+      if (this.consecutivePollingErrors >= 10) {
+        console.error('[FATAL] Too many consecutive polling errors (10+), exiting for PM2 restart...');
+        process.exit(1);  // PM2 will restart automatically
+      }
+    });
+
+    // Reset error counter on successful message receipt
+    this.bot.on('message', () => { this.consecutivePollingErrors = 0; });
     
     this.options = {
       workingDirectory: process.cwd(), // Claude Code can work in any directory
