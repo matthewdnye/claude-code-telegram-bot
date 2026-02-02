@@ -1903,14 +1903,36 @@ class StreamTelegramBot {
 
 
   /**
-   * Setup process cleanup for activity indicators
+   * Setup process cleanup for activity indicators and child processes
    */
   setupProcessCleanup() {
+    const { globalRegistry } = require('./ProcessRegistry');
+
     const cleanup = async () => {
       console.log('\n📦 Bot shutting down - cleaning up...');
+
+      // 1. Kill all registered child processes first (prevents zombies)
+      const activeProcesses = globalRegistry.getActiveCount();
+      if (activeProcesses > 0) {
+        console.log(`🔪 Killing ${activeProcesses} registered child processes...`);
+        await globalRegistry.killAll();
+      }
+
+      // 2. Clean up activity indicators
       this.activityIndicator.cleanup();
-      
-      // Stop unified web server if running
+
+      // 3. Cancel all active message processors
+      for (const processor of this.activeProcessors) {
+        processor.cancel();
+      }
+      this.activeProcessors.clear();
+
+      // 4. Cleanup session manager
+      if (this.sessionManager) {
+        this.sessionManager.cleanup();
+      }
+
+      // 5. Stop unified web server if running
       if (this.webServerUrl) {
         console.log('🌐 Stopping unified web server...');
         try {
@@ -1919,12 +1941,35 @@ class StreamTelegramBot {
           console.error('Error stopping unified web server:', error);
         }
       }
-      
+
+      // 6. Stop Telegram polling
+      if (this.bot) {
+        this.bot.stopPolling();
+      }
+
+      console.log('✅ Cleanup complete');
       process.exit(0);
     };
 
     process.on('SIGINT', cleanup);
     process.on('SIGTERM', cleanup);
+
+    // Handle uncaught exceptions - still try to cleanup
+    process.on('uncaughtException', async (error) => {
+      console.error('[FATAL] Uncaught exception:', error);
+      try {
+        await globalRegistry.killAll();
+      } catch (e) {
+        console.error('[FATAL] Error during emergency cleanup:', e);
+      }
+      process.exit(1);
+    });
+
+    process.on('unhandledRejection', (reason, promise) => {
+      console.error('[WARNING] Unhandled rejection at:', promise, 'reason:', reason);
+      // Don't exit on unhandled rejection, but log it
+    });
+
     process.on('exit', async () => {
       this.activityIndicator.cleanup();
       if (this.webServerUrl) {

@@ -74,40 +74,36 @@ class ClaudeCodeTokenCounter {
 
   /**
    * Run claude-code /context command and capture output
+   * Uses ProcessRegistry for timeout handling and cleanup
    */
   async runClaudeCodeContext(workingDirectory) {
-    return new Promise((resolve, reject) => {
-      const child = spawn('claude-code', ['/context'], {
+    const { spawnWithTimeout } = require('./utils/spawnWithTimeout');
+
+    const { process: child, promise } = spawnWithTimeout(
+      'claude-code',
+      ['/context'],
+      {
         cwd: workingDirectory,
         stdio: ['pipe', 'pipe', 'pipe']
-      });
+      },
+      'token-counter-context',
+      30000 // 30 second timeout
+    );
 
-      let stdout = '';
-      let stderr = '';
+    // Close stdin to avoid hanging
+    child.stdin.end();
 
-      child.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
+    const result = await promise;
 
-      child.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
+    if (result.timedOut) {
+      throw new Error('Claude Code /context command timed out after 30 seconds');
+    }
 
-      child.on('close', (code) => {
-        if (code === 0) {
-          resolve(stdout);
-        } else {
-          reject(new Error(`Claude Code /context failed with code ${code}: ${stderr}`));
-        }
-      });
+    if (result.code !== 0) {
+      throw new Error(`Claude Code /context failed with code ${result.code}: ${result.stderr}`);
+    }
 
-      child.on('error', (error) => {
-        reject(new Error(`Failed to run claude-code: ${error.message}`));
-      });
-
-      // Close stdin to avoid hanging
-      child.stdin.end();
-    });
+    return result.stdout;
   }
 
   /**

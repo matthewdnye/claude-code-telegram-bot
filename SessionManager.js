@@ -2517,127 +2517,131 @@ class SessionManager {
 
   /**
    * Execute Claude compact command
+   * Uses ProcessRegistry for timeout handling and cleanup
    */
   async _executeClaudeCompact(sessionId) {
-    return new Promise((resolve) => {
-      try {
-        const { spawn } = require('child_process');
-        
-        console.log(`[SessionManager] Executing compact for session ${sessionId.slice(-8)}`);
-        
-        const compactProcess = spawn('claude', ['-r', sessionId, '/compact'], {
+    const { spawnWithTimeout } = require('./utils/spawnWithTimeout');
+
+    try {
+      console.log(`[SessionManager] Executing compact for session ${sessionId.slice(-8)}`);
+
+      const { process: compactProcess, promise } = spawnWithTimeout(
+        'claude',
+        ['-r', sessionId, '/compact'],
+        {
           cwd: this.options.workingDirectory,
           stdio: ['ignore', 'pipe', 'pipe']
-        });
+        },
+        `compact-${sessionId.slice(-8)}`,
+        60000 // 60 second timeout for compact
+      );
 
-        let stderr = '';
+      let stderr = '';
 
-        compactProcess.stdout.on('data', () => {
-          // Compact output is not needed, just consume the stream
-        });
+      compactProcess.stdout.on('data', () => {
+        // Compact output is not needed, just consume the stream
+      });
 
-        compactProcess.stderr.on('data', (data) => {
-          stderr += data.toString();
-        });
+      compactProcess.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
 
-        compactProcess.on('close', async (code) => {
-          if (code === 0) {
-            console.log(`[SessionManager] Compact completed for session ${sessionId.slice(-8)}, validating...`);
-            
-            // Test if session can actually be resumed after compact
-            const isResumable = await this._validateSessionAfterCompact(sessionId);
-            
-            if (isResumable) {
-              console.log(`[SessionManager] Compact successful for session ${sessionId.slice(-8)}`);
-              resolve(true);
-            } else {
-              console.error(`[SessionManager] Session ${sessionId.slice(-8)} still corrupted after compact`);
-              resolve(false);
-            }
-          } else {
-            console.error(`[SessionManager] Compact failed for session ${sessionId.slice(-8)}:`, stderr);
-            resolve(false);
-          }
-        });
+      const { code, timedOut } = await promise;
 
-        compactProcess.on('error', (error) => {
-          console.error('[SessionManager] Compact process error:', error);
-          resolve(false);
-        });
-
-      } catch (error) {
-        console.error('[SessionManager] Error executing compact:', error);
-        resolve(false);
+      if (timedOut) {
+        console.error(`[SessionManager] Compact timed out for session ${sessionId.slice(-8)}`);
+        return false;
       }
-    });
+
+      if (code === 0) {
+        console.log(`[SessionManager] Compact completed for session ${sessionId.slice(-8)}, validating...`);
+
+        // Test if session can actually be resumed after compact
+        const isResumable = await this._validateSessionAfterCompact(sessionId);
+
+        if (isResumable) {
+          console.log(`[SessionManager] Compact successful for session ${sessionId.slice(-8)}`);
+          return true;
+        } else {
+          console.error(`[SessionManager] Session ${sessionId.slice(-8)} still corrupted after compact`);
+          return false;
+        }
+      } else {
+        console.error(`[SessionManager] Compact failed for session ${sessionId.slice(-8)}:`, stderr);
+        return false;
+      }
+
+    } catch (error) {
+      console.error('[SessionManager] Compact process error:', error);
+      return false;
+    }
   }
 
   /**
    * Validate that a session can be resumed after compact
+   * Uses ProcessRegistry for timeout handling and cleanup
    */
   async _validateSessionAfterCompact(sessionId) {
-    return new Promise((resolve) => {
-      try {
-        const { spawn } = require('child_process');
-        
-        console.log(`[SessionManager] Validating session ${sessionId.slice(-8)} after compact`);
-        
-        // Try to resume with a simple validation message  
-        const userModel = this.getUserModel(this.mainBot.adminUserId) || this.options.model || 'sonnet';
-        const testProcess = spawn('claude', ['-r', sessionId, '--model', userModel, 'echo \'validation test\''], {
+    const { spawnWithTimeout } = require('./utils/spawnWithTimeout');
+
+    try {
+      console.log(`[SessionManager] Validating session ${sessionId.slice(-8)} after compact`);
+
+      // Try to resume with a simple validation message
+      const userModel = this.getUserModel(this.mainBot.adminUserId) || this.options.model || 'sonnet';
+
+      const { process: testProcess, promise } = spawnWithTimeout(
+        'claude',
+        ['-r', sessionId, '--model', userModel, 'echo \'validation test\''],
+        {
           cwd: this.options.workingDirectory,
           stdio: ['ignore', 'pipe', 'pipe']
-        });
+        },
+        `validate-${sessionId.slice(-8)}`,
+        30000 // 30 second timeout for validation
+      );
 
-        let stdout = '';
-        let stderr = '';
-        let hasResponse = false;
+      let stdout = '';
+      let stderr = '';
+      let hasResponse = false;
 
-        testProcess.stdout.on('data', (data) => {
-          stdout += data.toString();
-          // If we get any actual response (not error), session is working
-          if (stdout.includes('"type":"assistant"') || stdout.includes('validation test')) {
-            hasResponse = true;
-          }
-        });
+      testProcess.stdout.on('data', (data) => {
+        stdout += data.toString();
+        // If we get any actual response (not error), session is working
+        if (stdout.includes('"type":"assistant"') || stdout.includes('validation test')) {
+          hasResponse = true;
+        }
+      });
 
-        testProcess.stderr.on('data', (data) => {
-          stderr += data.toString();
-        });
+      testProcess.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
 
-        testProcess.on('close', (code) => {
-          // Session is valid if:
-          // 1. Exit code is 0 AND we got a response, OR
-          // 2. Exit code is non-zero but we got actual content (sometimes Claude returns 1 but works), OR
-          // 3. Exit code is 0 even without response (compact worked, just no output)
-          const isValid = (code === 0) || (hasResponse && !stderr.includes('Prompt is too long'));
-          
-          if (isValid) {
-            console.log(`[SessionManager] Session ${sessionId.slice(-8)} validation successful - code: ${code}, hasResponse: ${hasResponse}`);
-          } else {
-            console.log(`[SessionManager] Session ${sessionId.slice(-8)} validation failed - code: ${code}, hasResponse: ${hasResponse}, stderr: ${stderr.slice(0, 200)}, stdout: ${stdout.slice(0, 200)}`);
-          }
-          
-          resolve(isValid);
-        });
+      const { code, timedOut } = await promise;
 
-        testProcess.on('error', (error) => {
-          console.error('[SessionManager] Session validation error:', error);
-          resolve(false);
-        });
-
-        // Timeout after 30 seconds
-        setTimeout(() => {
-          testProcess.kill();
-          console.log(`[SessionManager] Session ${sessionId.slice(-8)} validation timeout`);
-          resolve(false);
-        }, 30000);
-        
-      } catch (error) {
-        console.error('[SessionManager] Error validating session after compact:', error);
-        resolve(false);
+      if (timedOut) {
+        console.log(`[SessionManager] Session ${sessionId.slice(-8)} validation timeout`);
+        return false;
       }
-    });
+
+      // Session is valid if:
+      // 1. Exit code is 0 AND we got a response, OR
+      // 2. Exit code is non-zero but we got actual content (sometimes Claude returns 1 but works), OR
+      // 3. Exit code is 0 even without response (compact worked, just no output)
+      const isValid = (code === 0) || (hasResponse && !stderr.includes('Prompt is too long'));
+
+      if (isValid) {
+        console.log(`[SessionManager] Session ${sessionId.slice(-8)} validation successful - code: ${code}, hasResponse: ${hasResponse}`);
+      } else {
+        console.log(`[SessionManager] Session ${sessionId.slice(-8)} validation failed - code: ${code}, hasResponse: ${hasResponse}, stderr: ${stderr.slice(0, 200)}, stdout: ${stdout.slice(0, 200)}`);
+      }
+
+      return isValid;
+
+    } catch (error) {
+      console.error('[SessionManager] Session validation error:', error);
+      return false;
+    }
   }
 
   /**

@@ -295,21 +295,47 @@ class MultiTunnelAdapter {
     }
 
     /**
-     * Close all tunnels
+     * Close all tunnels with SIGKILL escalation
      */
     async closeAllTunnels() {
         console.log(`[MultiTunnelAdapter] Closing all tunnels...`);
-        
+
+        const killPromises = [];
+
         for (const [tunnelId, tunnelInfo] of this.tunnels) {
-            try {
-                if (tunnelInfo.process && !tunnelInfo.process.killed) {
-                    tunnelInfo.process.kill('SIGTERM');
+            killPromises.push(new Promise((resolve) => {
+                try {
+                    if (tunnelInfo.process && !tunnelInfo.process.killed) {
+                        tunnelInfo.process.kill('SIGTERM');
+
+                        // Force kill after 2 seconds if still alive
+                        const forceKillTimer = setTimeout(() => {
+                            if (!tunnelInfo.process.killed) {
+                                console.log(`[MultiTunnelAdapter] Force killing tunnel ${tunnelId}`);
+                                try {
+                                    tunnelInfo.process.kill('SIGKILL');
+                                } catch (e) {
+                                    // Already dead
+                                }
+                            }
+                            resolve();
+                        }, 2000);
+
+                        tunnelInfo.process.once('exit', () => {
+                            clearTimeout(forceKillTimer);
+                            resolve();
+                        });
+                    } else {
+                        resolve();
+                    }
+                } catch (error) {
+                    console.error(`[MultiTunnelAdapter] Error closing tunnel ${tunnelId}:`, error.message);
+                    resolve();
                 }
-            } catch (error) {
-                console.error(`[MultiTunnelAdapter] Error closing tunnel ${tunnelId}:`, error.message);
-            }
+            }));
         }
-        
+
+        await Promise.all(killPromises);
         this.tunnels.clear();
         console.log(`[MultiTunnelAdapter] All tunnels closed`);
     }
