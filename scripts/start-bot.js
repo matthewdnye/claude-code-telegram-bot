@@ -12,6 +12,14 @@ if (process.env.ANTHROPIC_API_KEY) {
   delete process.env.ANTHROPIC_API_KEY;
 }
 
+// Clear CLAUDECODE env var to prevent "nested session" detection
+// Tools like Claude Code Switcher set this variable globally, which causes
+// the Claude Code SDK to refuse to start thinking it's inside another session
+if (process.env.CLAUDECODE) {
+  console.log('🔧 Clearing CLAUDECODE env var to prevent nested session detection');
+  delete process.env.CLAUDECODE;
+}
+
 const path = require('path');
 const fs = require('fs');
 
