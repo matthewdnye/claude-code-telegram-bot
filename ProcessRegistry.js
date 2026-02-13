@@ -95,7 +95,7 @@ class ProcessRegistry extends EventEmitter {
     // Send SIGTERM
     try {
       process.kill('SIGTERM');
-    } catch (e) {
+    } catch {
       // Process may already be dead
       this._cleanup(processId);
       return;
@@ -115,7 +115,7 @@ class ProcessRegistry extends EventEmitter {
           console.log(`[ProcessRegistry] Force killing ${name} (${processId}) after SIGTERM timeout`);
           try {
             process.kill('SIGKILL');
-          } catch (e) {
+          } catch {
             // Already dead
           }
         }
@@ -149,7 +149,7 @@ class ProcessRegistry extends EventEmitter {
 
     try {
       process.kill('SIGKILL');
-    } catch (e) {
+    } catch {
       // Already dead
     }
 
@@ -195,7 +195,7 @@ class ProcessRegistry extends EventEmitter {
       try {
         entry.process.removeListener('exit', entry.onExit);
         entry.process.removeListener('error', entry.onError);
-      } catch (e) {
+      } catch {
         // Process may be in an invalid state
       }
 

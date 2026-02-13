@@ -190,7 +190,7 @@ class TelegramMCPIntegration {
       const remainingFiles = await fs.promises.readdir(configDir);
       if (remainingFiles.length === 0) {
         await fs.promises.rmdir(configDir);
-        console.log(`🧹 Cleaned up empty config directory`);
+        console.log('🧹 Cleaned up empty config directory');
       }
     } catch (error) {
       console.error('❌ Error during cleanup:', error.message);

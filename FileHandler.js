@@ -52,7 +52,6 @@ class FileHandler {
    */
   async handleDocumentMessage(msg, processUserMessageCallback) {
     const userId = msg.from.id;
-    const chatId = msg.chat.id;
     const document = msg.document;
     const caption = msg.caption || '';
 
@@ -66,7 +65,6 @@ class FileHandler {
    */
   async handleVideoMessage(msg, processUserMessageCallback) {
     const userId = msg.from.id;
-    const chatId = msg.chat.id;
     const video = msg.video;
     const caption = msg.caption || '';
 
@@ -80,7 +78,6 @@ class FileHandler {
    */
   async handleAudioMessage(msg, processUserMessageCallback) {
     const userId = msg.from.id;
-    const chatId = msg.chat.id;
     const audio = msg.audio;
     const caption = msg.caption || '';
 
@@ -94,7 +91,6 @@ class FileHandler {
    */
   async handleAnimationMessage(msg, processUserMessageCallback) {
     const userId = msg.from.id;
-    const chatId = msg.chat.id;
     const animation = msg.animation;
     const caption = msg.caption || '';
 
@@ -108,7 +104,6 @@ class FileHandler {
    */
   async handleStickerMessage(msg, processUserMessageCallback) {
     const userId = msg.from.id;
-    const chatId = msg.chat.id;
     const sticker = msg.sticker;
 
     console.log(`[User ${userId}] Sticker message: ${sticker.emoji || 'No emoji'} (${sticker.file_size} bytes)`);
@@ -139,7 +134,7 @@ class FileHandler {
       console.log(`[User ${userId}] Downloaded ${fileType} to temp: ${filePath}`);
 
       // Create message for Claude with file path and caption
-      let message = this.createFileMessage(fileType, fileObject, filePath, caption);
+      const message = this.createFileMessage(fileType, fileObject, filePath, caption);
 
       console.log(`[User ${userId}] Sending to Claude: "${message}"`);
 
@@ -237,55 +232,55 @@ class FileHandler {
     }
 
     switch (fileType) {
-      case 'document':
-        message += `Document file: ${filePath}\nFilename: ${fileName}\nSize: ${fileSize}KB`;
-        if (fileObject.mime_type) {
-          message += `\nMIME Type: ${fileObject.mime_type}`;
-        }
-        break;
+    case 'document':
+      message += `Document file: ${filePath}\nFilename: ${fileName}\nSize: ${fileSize}KB`;
+      if (fileObject.mime_type) {
+        message += `\nMIME Type: ${fileObject.mime_type}`;
+      }
+      break;
 
-      case 'video':
-        message += `Video file: ${filePath}\nFilename: ${fileName}\nSize: ${fileSize}KB`;
-        if (fileObject.width && fileObject.height) {
-          message += `\nDimensions: ${fileObject.width}x${fileObject.height}`;
-        }
-        if (fileObject.duration) {
-          message += `\nDuration: ${fileObject.duration}s`;
-        }
-        break;
+    case 'video':
+      message += `Video file: ${filePath}\nFilename: ${fileName}\nSize: ${fileSize}KB`;
+      if (fileObject.width && fileObject.height) {
+        message += `\nDimensions: ${fileObject.width}x${fileObject.height}`;
+      }
+      if (fileObject.duration) {
+        message += `\nDuration: ${fileObject.duration}s`;
+      }
+      break;
 
-      case 'audio':
-        message += `Audio file: ${filePath}\nFilename: ${fileName}\nSize: ${fileSize}KB`;
-        if (fileObject.duration) {
-          message += `\nDuration: ${fileObject.duration}s`;
-        }
-        if (fileObject.title) {
-          message += `\nTitle: ${fileObject.title}`;
-        }
-        if (fileObject.performer) {
-          message += `\nPerformer: ${fileObject.performer}`;
-        }
-        break;
+    case 'audio':
+      message += `Audio file: ${filePath}\nFilename: ${fileName}\nSize: ${fileSize}KB`;
+      if (fileObject.duration) {
+        message += `\nDuration: ${fileObject.duration}s`;
+      }
+      if (fileObject.title) {
+        message += `\nTitle: ${fileObject.title}`;
+      }
+      if (fileObject.performer) {
+        message += `\nPerformer: ${fileObject.performer}`;
+      }
+      break;
 
-      case 'animation':
-        message += `Animation/GIF file: ${filePath}\nFilename: ${fileName}\nSize: ${fileSize}KB`;
-        if (fileObject.width && fileObject.height) {
-          message += `\nDimensions: ${fileObject.width}x${fileObject.height}`;
-        }
-        break;
+    case 'animation':
+      message += `Animation/GIF file: ${filePath}\nFilename: ${fileName}\nSize: ${fileSize}KB`;
+      if (fileObject.width && fileObject.height) {
+        message += `\nDimensions: ${fileObject.width}x${fileObject.height}`;
+      }
+      break;
 
-      case 'sticker':
-        message += `Sticker file: ${filePath}\nSize: ${fileSize}KB`;
-        if (fileObject.emoji) {
-          message += `\nEmoji: ${fileObject.emoji}`;
-        }
-        if (fileObject.set_name) {
-          message += `\nSticker Set: ${fileObject.set_name}`;
-        }
-        break;
+    case 'sticker':
+      message += `Sticker file: ${filePath}\nSize: ${fileSize}KB`;
+      if (fileObject.emoji) {
+        message += `\nEmoji: ${fileObject.emoji}`;
+      }
+      if (fileObject.set_name) {
+        message += `\nSticker Set: ${fileObject.set_name}`;
+      }
+      break;
 
-      default:
-        message += `File: ${filePath}\nFilename: ${fileName}\nSize: ${fileSize}KB`;
+    default:
+      message += `File: ${filePath}\nFilename: ${fileName}\nSize: ${fileSize}KB`;
     }
 
     if (!caption.trim()) {
@@ -550,7 +545,7 @@ class FileHandler {
           cleanedCount++;
         }
       } catch (error) {
-        console.error(`Failed to cleanup temp file on shutdown:`, error);
+        console.error('Failed to cleanup temp file on shutdown:', error);
       }
     }
     

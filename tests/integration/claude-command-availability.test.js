@@ -64,7 +64,7 @@ describe('Claude Command Availability Integration Tests', () => {
   describe('Service Environment Simulation', () => {
     test('should simulate restricted PATH failure (systemd service)', async () => {
       // Simulate systemd service environment with restricted PATH
-      const restrictedPath = '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin';
+      // Simulated restricted PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
       
       // Mock the expected behavior without spawning real claude
       const simulatedError = {

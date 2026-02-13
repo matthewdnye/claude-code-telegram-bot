@@ -403,7 +403,7 @@ function mockAxiosFileOperations() {
   });
 
   // Mock API requests
-  axios.post.mockImplementation((url, data) => {
+  axios.post.mockImplementation((url, _data) => {
     if (url.includes('api.telegram.org/bot')) {
       return Promise.resolve({
         data: { ok: true, result: { message_id: 123 } }

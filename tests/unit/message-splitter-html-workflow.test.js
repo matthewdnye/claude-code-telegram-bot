@@ -135,7 +135,7 @@ describe('MessageSplitter HTML Workflow Integration', () => {
         expect(options?.parse_mode).toBe('HTML');
         
         // Remove part indicators for HTML balance check
-        const messageContent = message.replace(/\n\n_\\[Part \d+\/\d+\\]_$/, '');
+        const messageContent = message.replace(/\n\n_\\[Part \d+/\d+\\]_$/, '');
         const isBalanced = splitter.isHtmlBalanced(messageContent);
         
         if (!isBalanced) {
@@ -219,7 +219,7 @@ describe('MessageSplitter HTML Workflow Integration', () => {
         try {
           const formatted = formatter.formatAssistantText(testData);
           await splitter.sendLongMessage(mockBot, 12345, formatted);
-        } catch (error) {
+        } catch {
           // Fall back to plain text
           await splitter.sendLongMessage(mockBot, 12345, testData);
         }

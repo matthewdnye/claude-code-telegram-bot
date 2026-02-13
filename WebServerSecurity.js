@@ -6,122 +6,122 @@ const crypto = require('crypto');
  * One-time setup, automatic protection for all routes
  */
 class WebServerSecurity {
-    constructor(botInstance = 'bot1') {
-        this.botInstance = botInstance;
-        this.securityToken = this.generateSecurityToken();
-        this.excludedPaths = ['/static', '/assets', '/public']; // Static assets don't need tokens
+  constructor(botInstance = 'bot1') {
+    this.botInstance = botInstance;
+    this.securityToken = this.generateSecurityToken();
+    this.excludedPaths = ['/static', '/assets', '/public']; // Static assets don't need tokens
         
-        console.log(`[${this.botInstance}] 🔐 WebServerSecurity initialized with token authentication`);
-    }
+    console.log(`[${this.botInstance}] 🔐 WebServerSecurity initialized with token authentication`);
+  }
 
-    /**
+  /**
      * Generate a cryptographically secure token
      */
-    generateSecurityToken() {
-        const token = crypto.randomBytes(32).toString('hex');
-        console.log(`[${this.botInstance}] 🔑 Generated security token (${token.length} chars)`);
-        return token;
-    }
+  generateSecurityToken() {
+    const token = crypto.randomBytes(32).toString('hex');
+    console.log(`[${this.botInstance}] 🔑 Generated security token (${token.length} chars)`);
+    return token;
+  }
 
-    /**
+  /**
      * Express middleware for token validation
      * Apply this to your Express app to protect all routes automatically
      */
-    getMiddleware() {
-        return (req, res, next) => {
-            // Skip token validation for excluded paths (static assets, etc.)
-            if (this.isPathExcluded(req.path)) {
-                return next();
-            }
+  getMiddleware() {
+    return (req, res, next) => {
+      // Skip token validation for excluded paths (static assets, etc.)
+      if (this.isPathExcluded(req.path)) {
+        return next();
+      }
 
-            // Check for token in URL parameter or cookie
-            const providedToken = req.query.token || this.getTokenFromCookies(req);
-            const isValidToken = providedToken === this.securityToken;
+      // Check for token in URL parameter or cookie
+      const providedToken = req.query.token || this.getTokenFromCookies(req);
+      const isValidToken = providedToken === this.securityToken;
 
-            if (!isValidToken) {
-                console.log(`[${this.botInstance}] 🚫 Unauthorized access: ${req.ip} -> ${req.path} (${providedToken ? 'invalid token' : 'missing token'})`);
-                return res.status(403).send(this.generateSecurityErrorPage());
-            }
+      if (!isValidToken) {
+        console.log(`[${this.botInstance}] 🚫 Unauthorized access: ${req.ip} -> ${req.path} (${providedToken ? 'invalid token' : 'missing token'})`);
+        return res.status(403).send(this.generateSecurityErrorPage());
+      }
 
-            console.log(`[${this.botInstance}] ✅ Authorized access: ${req.ip} -> ${req.path}`);
-            next();
-        };
-    }
+      console.log(`[${this.botInstance}] ✅ Authorized access: ${req.ip} -> ${req.path}`);
+      next();
+    };
+  }
 
-    /**
+  /**
      * Check if a path should be excluded from token validation
      */
-    isPathExcluded(path) {
-        return this.excludedPaths.some(excluded => path.startsWith(excluded));
-    }
+  isPathExcluded(path) {
+    return this.excludedPaths.some(excluded => path.startsWith(excluded));
+  }
 
-    /**
+  /**
      * Generate secure URL with token for any path
      * Use this in your HTML templates to create secure links
      */
-    secureUrl(path, queryParams = {}) {
-        queryParams.token = this.securityToken;
-        const params = new URLSearchParams(queryParams).toString();
-        return `${path}?${params}`;
-    }
+  secureUrl(path, queryParams = {}) {
+    queryParams.token = this.securityToken;
+    const params = new URLSearchParams(queryParams).toString();
+    return `${path}?${params}`;
+  }
 
-    /**
+  /**
      * Generate secure external URL (for ngrok public URLs)
      * Use this when providing URLs to Telegram bot buttons
      */
-    secureExternalUrl(baseUrl, path = '/', queryParams = {}) {
-        queryParams.token = this.securityToken;
-        const params = new URLSearchParams(queryParams).toString();
-        return `${baseUrl}${path}?${params}`;
-    }
+  secureExternalUrl(baseUrl, path = '/', queryParams = {}) {
+    queryParams.token = this.securityToken;
+    const params = new URLSearchParams(queryParams).toString();
+    return `${baseUrl}${path}?${params}`;
+  }
 
-    /**
+  /**
      * Get current security token (for external systems)
      */
-    getToken() {
-        return this.securityToken;
-    }
+  getToken() {
+    return this.securityToken;
+  }
 
-    /**
+  /**
      * Regenerate security token (invalidates all existing links)
      */
-    regenerateToken() {
-        const oldToken = this.securityToken;
-        this.securityToken = this.generateSecurityToken();
-        console.log(`[${this.botInstance}] 🔄 Security token regenerated (old: ${oldToken.slice(0, 8)}..., new: ${this.securityToken.slice(0, 8)}...)`);
-        return this.securityToken;
-    }
+  regenerateToken() {
+    const oldToken = this.securityToken;
+    this.securityToken = this.generateSecurityToken();
+    console.log(`[${this.botInstance}] 🔄 Security token regenerated (old: ${oldToken.slice(0, 8)}..., new: ${this.securityToken.slice(0, 8)}...)`);
+    return this.securityToken;
+  }
 
-    /**
+  /**
      * Extract auth_token from request cookies
      * Simple cookie parser that doesn't require external dependencies
      */
-    getTokenFromCookies(req) {
-        const cookieHeader = req.headers.cookie;
-        if (!cookieHeader) return null;
+  getTokenFromCookies(req) {
+    const cookieHeader = req.headers.cookie;
+    if (!cookieHeader) return null;
 
-        const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
-            const [name, value] = cookie.trim().split('=');
-            acc[name] = value;
-            return acc;
-        }, {});
+    const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
+      const [name, value] = cookie.trim().split('=');
+      acc[name] = value;
+      return acc;
+    }, {});
 
-        return cookies.auth_token || null;
-    }
+    return cookies.auth_token || null;
+  }
 
-    /**
+  /**
      * Add paths to exclude from token validation
      */
-    excludePaths(...paths) {
-        this.excludedPaths.push(...paths);
-        console.log(`[${this.botInstance}] ➕ Added excluded paths: ${paths.join(', ')}`);
-    }
+  excludePaths(...paths) {
+    this.excludedPaths.push(...paths);
+    console.log(`[${this.botInstance}] ➕ Added excluded paths: ${paths.join(', ')}`);
+  }
 
-    /**
+  /**
      * Generate professional security error page
      */
-    generateSecurityErrorPage() {
-        return `
+  generateSecurityErrorPage() {
+    return `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -234,49 +234,49 @@ class WebServerSecurity {
     </div>
 </body>
 </html>`;
-    }
+  }
 
-    /**
+  /**
      * Generate a lightweight error response (for API endpoints)
      */
-    generateApiErrorResponse() {
-        return {
-            error: 'Access Denied',
-            message: 'Valid security token required',
-            code: 403,
-            timestamp: new Date().toISOString()
-        };
-    }
+  generateApiErrorResponse() {
+    return {
+      error: 'Access Denied',
+      message: 'Valid security token required',
+      code: 403,
+      timestamp: new Date().toISOString()
+    };
+  }
 
-    /**
+  /**
      * Utility method to create secure HTML links
      * Use this in your templates: ${security.link('/path', 'Link Text', {param: 'value'})}
      */
-    link(path, text, queryParams = {}, className = '') {
-        const url = this.secureUrl(path, queryParams);
-        const classAttr = className ? ` class="${className}"` : '';
-        return `<a href="${url}"${classAttr}>${text}</a>`;
-    }
+  link(path, text, queryParams = {}, className = '') {
+    const url = this.secureUrl(path, queryParams);
+    const classAttr = className ? ` class="${className}"` : '';
+    return `<a href="${url}"${classAttr}>${text}</a>`;
+  }
 
-    /**
+  /**
      * Utility method for secure form actions
      */
-    formAction(action, queryParams = {}) {
-        return this.secureUrl(action, queryParams);
-    }
+  formAction(action, queryParams = {}) {
+    return this.secureUrl(action, queryParams);
+  }
 
-    /**
+  /**
      * Get security stats/info
      */
-    getSecurityInfo() {
-        return {
-            botInstance: this.botInstance,
-            tokenLength: this.securityToken.length,
-            tokenPreview: this.securityToken.slice(0, 8) + '...',
-            excludedPaths: [...this.excludedPaths],
-            active: true
-        };
-    }
+  getSecurityInfo() {
+    return {
+      botInstance: this.botInstance,
+      tokenLength: this.securityToken.length,
+      tokenPreview: this.securityToken.slice(0, 8) + '...',
+      excludedPaths: [...this.excludedPaths],
+      active: true
+    };
+  }
 }
 
 module.exports = WebServerSecurity;

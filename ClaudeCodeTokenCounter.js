@@ -8,7 +8,6 @@
  * 4. Providing the same breakdown format as Claude Code
  */
 
-const { spawn } = require('child_process');
 const fs = require('fs').promises;
 const path = require('path');
 
@@ -194,7 +193,7 @@ class ClaudeCodeTokenCounter {
       try {
         const stats = await fs.stat(globalClaudeMd);
         totalMemoryTokens += Math.ceil(stats.size / 4); // ~4 chars per token
-      } catch (err) {
+      } catch {
         // File doesn't exist, skip
       }
       
@@ -203,7 +202,7 @@ class ClaudeCodeTokenCounter {
       try {
         const stats = await fs.stat(projectClaudeMd);
         totalMemoryTokens += Math.ceil(stats.size / 4); // ~4 chars per token
-      } catch (err) {
+      } catch {
         // File doesn't exist, skip
       }
       
@@ -234,7 +233,7 @@ class ClaudeCodeTokenCounter {
               totalInputTokens += entry.usage.input_tokens || 0;
               totalOutputTokens += entry.usage.output_tokens || 0;
             }
-          } catch (err) {
+          } catch {
             // Skip malformed lines
           }
         }
@@ -305,7 +304,7 @@ class ClaudeCodeTokenCounter {
     const { grandTotal, contextLimit, usagePercentage, freeSpace } = breakdown;
     
     let output = '';
-    output += `Context Usage\n`;
+    output += 'Context Usage\n';
     output += `claude-sonnet-4-20250514 • ${Math.round(grandTotal/1000)}k/${Math.round(contextLimit/1000)}k tokens (${usagePercentage}%)\n\n`;
     
     // Component breakdown

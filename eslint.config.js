@@ -44,6 +44,7 @@ module.exports = [
       'dist/',
       'tmp/',
       'claudia-source/',
+      'public/assets/*.min.js',
       '*.config.js'
     ]
   }

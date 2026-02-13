@@ -5,7 +5,6 @@
 
 const ClaudeCodeTokenCounter = require('../../ClaudeCodeTokenCounter');
 const fs = require('fs').promises;
-const path = require('path');
 
 // Mock child_process spawn
 const mockSpawn = jest.fn();

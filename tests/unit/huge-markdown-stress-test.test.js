@@ -310,7 +310,7 @@ describe('Huge Markdown Stress Test - Real-world LLM Content', () => {
       expect(result.length).toBeGreaterThan(0);
       
       // Should have proper HTML structure
-      const openTags = (result.match(/<[^\/][^>]*>/g) || []).length;
+      const openTags = (result.match(/<[^/][^>]*>/g) || []).length;
       const closeTags = (result.match(/<\/[^>]*>/g) || []).length;
       
       // HTML should be reasonably balanced (some tags like <br> don't need closing)

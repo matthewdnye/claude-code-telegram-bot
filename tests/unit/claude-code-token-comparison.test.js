@@ -12,8 +12,6 @@
  */
 
 const SessionManager = require('../../SessionManager');
-const path = require('path');
-const fs = require('fs');
 
 // Mock dependencies
 jest.mock('../../claude-stream-processor');

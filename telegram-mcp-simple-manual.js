@@ -48,17 +48,17 @@ class SimpleMCPServer {
       let result;
 
       switch (method) {
-        case 'initialize':
-          result = await this.handleInitialize(params);
-          break;
-        case 'tools/list':
-          result = await this.handleToolsList(params);
-          break;
-        case 'tools/call':
-          result = await this.handleToolsCall(params);
-          break;
-        default:
-          throw new Error(`Unknown method: ${method}`);
+      case 'initialize':
+        result = await this.handleInitialize(params);
+        break;
+      case 'tools/list':
+        result = await this.handleToolsList(params);
+        break;
+      case 'tools/call':
+        result = await this.handleToolsCall(params);
+        break;
+      default:
+        throw new Error(`Unknown method: ${method}`);
       }
 
       this.sendResponse(id, result);
@@ -67,7 +67,7 @@ class SimpleMCPServer {
     }
   }
 
-  async handleInitialize(params) {
+  async handleInitialize(_params) {
     console.error(`[${this.botId}] Initializing MCP server...`);
     
     // Test Telegram connection
@@ -75,18 +75,18 @@ class SimpleMCPServer {
     console.error(`[${this.botId}] Bot connected: @${me.username}`);
 
     return {
-      protocolVersion: "2024-11-05",
+      protocolVersion: '2024-11-05',
       capabilities: {
         tools: {}
       },
       serverInfo: {
         name: `telegram-sender-${this.botId}`,
-        version: "1.0.0"
+        version: '1.0.0'
       }
     };
   }
 
-  async handleToolsList(params) {
+  async handleToolsList(_params) {
     return {
       tools: [
         {
@@ -133,12 +133,12 @@ class SimpleMCPServer {
     const { name, arguments: args } = params;
 
     switch (name) {
-      case 'send_telegram_image':
-        return await this.sendImage(args);
-      case 'send_telegram_document':
-        return await this.sendDocument(args);
-      default:
-        throw new Error(`Unknown tool: ${name}`);
+    case 'send_telegram_image':
+      return await this.sendImage(args);
+    case 'send_telegram_document':
+      return await this.sendDocument(args);
+    default:
+      throw new Error(`Unknown tool: ${name}`);
     }
   }
 
@@ -203,7 +203,7 @@ class SimpleMCPServer {
 
   sendResponse(id, result) {
     const response = {
-      jsonrpc: "2.0",
+      jsonrpc: '2.0',
       id: id,
       result: result
     };
@@ -212,7 +212,7 @@ class SimpleMCPServer {
 
   sendError(id, error) {
     const response = {
-      jsonrpc: "2.0",
+      jsonrpc: '2.0',
       id: id,
       error: {
         code: -32000,
@@ -233,7 +233,7 @@ async function main() {
     process.exit(1);
   }
 
-  const server = new SimpleMCPServer(botId, botToken, chatId);
+  new SimpleMCPServer(botId, botToken, chatId);
   console.error(`[${botId}] Simple Manual MCP Server ready`);
 }
 

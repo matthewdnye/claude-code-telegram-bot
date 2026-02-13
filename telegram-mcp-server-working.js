@@ -105,12 +105,12 @@ class TelegramMCPServer {
 
       try {
         switch (name) {
-          case 'send_telegram_image':
-            return await this.sendImage(args);
-          case 'send_telegram_document':
-            return await this.sendDocument(args);
-          default:
-            throw new Error(`Unknown tool: ${name}`);
+        case 'send_telegram_image':
+          return await this.sendImage(args);
+        case 'send_telegram_document':
+          return await this.sendDocument(args);
+        default:
+          throw new Error(`Unknown tool: ${name}`);
         }
       } catch (error) {
         return {

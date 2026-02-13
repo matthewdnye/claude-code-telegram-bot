@@ -35,7 +35,7 @@ async function testSessionIdFiltering() {
     try {
       // This will fail in test environment, but we can check the arguments
       await processor.startNewConversation('test prompt');
-    } catch (error) {
+    } catch {
       // Expected to fail in test environment
       const lastArgs = processor.getLastClaudeArgs();
       console.log('📋 Args for new conversation:', lastArgs);
@@ -58,7 +58,7 @@ async function testSessionIdFiltering() {
     
     try {
       await processor.resumeSession('existing-session-id', 'continue prompt');
-    } catch (error) {
+    } catch {
       // Expected to fail in test environment
       const lastArgs = processor.getLastClaudeArgs();
       console.log('📋 Args for resume session:', lastArgs);
@@ -83,7 +83,7 @@ async function testSessionIdFiltering() {
     
     try {
       await processor.continueConversation('continue prompt', null);
-    } catch (error) {
+    } catch {
       // Expected to fail in test environment
       const lastArgs = processor.getLastClaudeArgs();
       console.log('📋 Args for continue conversation:', lastArgs);

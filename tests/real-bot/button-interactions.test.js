@@ -331,7 +331,7 @@ describe('Real Bot Integration - Button Interactions', () => {
               try {
                 const response = await testHelper.sendMessageAndWaitForResponse(buttonText, 2000);
                 results.push({ buttonText, handled: !!response });
-              } catch (error) {
+              } catch {
                 results.push({ buttonText, handled: false, treatAsRegular: true });
               }
             }

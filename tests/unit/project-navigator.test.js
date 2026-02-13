@@ -582,7 +582,7 @@ describe('ProjectNavigator', () => {
           'project-', // Ends with dash
           'my_project', // Contains underscore
           'my@project', // Contains special character
-          'very-long-project-name-that-definitely-exceeds-the-limit', // Too long
+          'very-long-project-name-that-definitely-exceeds-the-limit' // Too long
         ];
 
         invalidNames.forEach(name => {

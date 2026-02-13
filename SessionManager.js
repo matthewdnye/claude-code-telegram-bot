@@ -39,8 +39,8 @@ class SessionManager {
     
     // ActivityWatch integration for time tracking
     this.activityWatch = new ActivityWatchIntegration({
-      enabled: this.mainBot.configManager.getActivityWatchEnabled(),
-      timeMultiplier: this.mainBot.configManager.getActivityWatchTimeMultiplier()
+      enabled: this.mainBot.configManager?.getActivityWatchEnabled() ?? false,
+      timeMultiplier: this.mainBot.configManager?.getActivityWatchTimeMultiplier() ?? 1.0
     });
     
     // Claude Code accurate token counter
@@ -898,7 +898,7 @@ class SessionManager {
       const breakdown = await this.getAccurateTokenBreakdown(sessionId);
       
       // Format output similar to Claude Code /context
-      let text = `**Context Usage**\n`;
+      let text = '**Context Usage**\n';
       text += `**${this.options.model}** • **${Math.round(breakdown.grandTotal/1000)}k/${Math.round(breakdown.contextLimit/1000)}k tokens (${breakdown.usagePercentage}%)**\n\n`;
       
       // Component breakdown
@@ -916,7 +916,7 @@ class SessionManager {
       text += `⛶ **Free space:** ${(breakdown.freeSpace/1000).toFixed(1)}k (${(breakdown.freeSpace/breakdown.contextLimit*100).toFixed(1)}%)\n\n`;
       
       if (breakdown.breakdown && breakdown.breakdown.mcpTools && breakdown.breakdown.mcpTools.length > 0) {
-        text += `**MCP Tools:**\n`;
+        text += '**MCP Tools:**\n';
         for (const tool of breakdown.breakdown.mcpTools.slice(0, 5)) { // Show first 5
           text += `└ ${tool.name}: ${tool.tokens} tokens\n`;
         }
@@ -927,7 +927,7 @@ class SessionManager {
       }
       
       if (breakdown.breakdown && breakdown.breakdown.customAgents && breakdown.breakdown.customAgents.length > 0) {
-        text += `**Custom Agents:**\n`;
+        text += '**Custom Agents:**\n';
         for (const agent of breakdown.breakdown.customAgents.slice(0, 5)) { // Show first 5
           text += `└ ${agent.name}: ${agent.tokens} tokens\n`;
         }
@@ -1442,8 +1442,7 @@ class SessionManager {
       }
 
       // Calculate cumulative message counts for session chains
-      const sessionMap = new Map(sessions.map(session => [session.sessionId, session]));
-      
+
       // Function to calculate cumulative message count for a session
       const calculateCumulativeCount = (session, visited = new Set()) => {
         if (visited.has(session.sessionId)) {
@@ -1695,7 +1694,7 @@ class SessionManager {
             console.log(`[SystemOverhead] Active cache: ${cacheSize} tokens`);
             return cacheSize;
           }
-        } catch (parseError) {
+        } catch {
           continue;
         }
       }

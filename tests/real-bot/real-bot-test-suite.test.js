@@ -27,7 +27,7 @@ describe('Real Bot Integration Test Suite', () => {
       const packageJson = require('../../package.json');
       console.log(`- telegram-test-api version: ${packageJson.devDependencies['telegram-test-api']}`);
       console.log(`- node-telegram-bot-api version: ${packageJson.dependencies['node-telegram-bot-api']}`);
-    } catch (error) {
+    } catch {
       console.warn('⚠️ Could not read package.json');
     }
     
@@ -114,7 +114,7 @@ describe('Real Bot Integration Test Suite', () => {
           name: 'Button Pressing', 
           test: async () => {
             await globalTestHelper.sendMessageAndWaitForResponse('🤖 Model');
-            const response = await globalTestHelper.pressButtonAndWaitForResponse('model:cancel');
+            await globalTestHelper.pressButtonAndWaitForResponse('model:cancel');
             return true; // Button press might not generate response
           }
         },

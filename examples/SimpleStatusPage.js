@@ -5,92 +5,92 @@ const BaseWebServer = require('../BaseWebServer');
  * Demonstrates how to create a new protected web page using BaseWebServer
  */
 class SimpleStatusPage extends BaseWebServer {
-    constructor(botInstance = 'bot1', ngrokAuthToken = null) {
-        super({ 
-            botInstance, 
-            ngrokAuthToken,
-            // You can add routes directly in constructor options
-            routes: [
-                {
-                    method: 'GET',
-                    path: '/api/status',
-                    handler: (req, res) => {
-                        res.json({
-                            status: 'active',
-                            botInstance: this.botInstance,
-                            uptime: process.uptime(),
-                            memory: process.memoryUsage(),
-                            timestamp: new Date().toISOString()
-                        });
-                    }
-                }
-            ]
-        });
-    }
+  constructor(botInstance = 'bot1', ngrokAuthToken = null) {
+    super({ 
+      botInstance, 
+      ngrokAuthToken,
+      // You can add routes directly in constructor options
+      routes: [
+        {
+          method: 'GET',
+          path: '/api/status',
+          handler: (req, res) => {
+            res.json({
+              status: 'active',
+              botInstance: this.botInstance,
+              uptime: process.uptime(),
+              memory: process.memoryUsage(),
+              timestamp: new Date().toISOString()
+            });
+          }
+        }
+      ]
+    });
+  }
     
-    /**
+  /**
      * Override setupRoutes to add custom functionality
      */
-    setupRoutes() {
-        // Call parent to set up basic routes
-        super.setupRoutes();
+  setupRoutes() {
+    // Call parent to set up basic routes
+    super.setupRoutes();
         
-        // Add main status page
-        this.app.get('/', (req, res) => {
-            const statusData = this.getStatusData();
-            const content = this.generateStatusHTML(statusData);
-            res.send(this.generateBasePage('Bot Status Dashboard', content, this.getStatusStyles()));
-        });
+    // Add main status page
+    this.app.get('/', (req, res) => {
+      const statusData = this.getStatusData();
+      const content = this.generateStatusHTML(statusData);
+      res.send(this.generateBasePage('Bot Status Dashboard', content, this.getStatusStyles()));
+    });
         
-        // Add system info page
-        this.app.get('/system', (req, res) => {
-            const systemData = this.getSystemData();
-            const content = this.generateSystemHTML(systemData);
-            res.send(this.generateBasePage('System Information', content));
-        });
-    }
+    // Add system info page
+    this.app.get('/system', (req, res) => {
+      const systemData = this.getSystemData();
+      const content = this.generateSystemHTML(systemData);
+      res.send(this.generateBasePage('System Information', content));
+    });
+  }
     
-    /**
+  /**
      * Get current status data
      */
-    getStatusData() {
-        return {
-            botInstance: this.botInstance,
-            status: 'Running',
-            uptime: Math.floor(process.uptime()),
-            memory: process.memoryUsage(),
-            nodeVersion: process.version,
-            platform: process.platform,
-            timestamp: new Date().toLocaleString()
-        };
-    }
+  getStatusData() {
+    return {
+      botInstance: this.botInstance,
+      status: 'Running',
+      uptime: Math.floor(process.uptime()),
+      memory: process.memoryUsage(),
+      nodeVersion: process.version,
+      platform: process.platform,
+      timestamp: new Date().toLocaleString()
+    };
+  }
     
-    /**
+  /**
      * Get system information
      */
-    getSystemData() {
-        const os = require('os');
-        return {
-            hostname: os.hostname(),
-            platform: os.platform(),
-            arch: os.arch(),
-            cpus: os.cpus().length,
-            totalMemory: (os.totalmem() / 1024 / 1024 / 1024).toFixed(2) + ' GB',
-            freeMemory: (os.freemem() / 1024 / 1024 / 1024).toFixed(2) + ' GB',
-            loadAvg: os.loadavg(),
-            uptime: Math.floor(os.uptime())
-        };
-    }
+  getSystemData() {
+    const os = require('os');
+    return {
+      hostname: os.hostname(),
+      platform: os.platform(),
+      arch: os.arch(),
+      cpus: os.cpus().length,
+      totalMemory: (os.totalmem() / 1024 / 1024 / 1024).toFixed(2) + ' GB',
+      freeMemory: (os.freemem() / 1024 / 1024 / 1024).toFixed(2) + ' GB',
+      loadAvg: os.loadavg(),
+      uptime: Math.floor(os.uptime())
+    };
+  }
     
-    /**
+  /**
      * Generate status page HTML
      */
-    generateStatusHTML(data) {
-        const memoryMB = (data.memory.used / 1024 / 1024).toFixed(2);
-        const uptimeHours = Math.floor(data.uptime / 3600);
-        const uptimeMinutes = Math.floor((data.uptime % 3600) / 60);
+  generateStatusHTML(data) {
+    const memoryMB = (data.memory.used / 1024 / 1024).toFixed(2);
+    const uptimeHours = Math.floor(data.uptime / 3600);
+    const uptimeMinutes = Math.floor((data.uptime % 3600) / 60);
         
-        return `
+    return `
             <div class="status-grid">
                 <div class="status-card">
                     <h3>🤖 Bot Status</h3>
@@ -142,13 +142,13 @@ class SimpleStatusPage extends BaseWebServer {
                 <p>Last updated: ${data.timestamp}</p>
             </div>
         `;
-    }
+  }
     
-    /**
+  /**
      * Generate system information HTML
      */
-    generateSystemHTML(data) {
-        return `
+  generateSystemHTML(data) {
+    return `
             <div class="system-info">
                 <div class="info-section">
                     <h3>System Overview</h3>
@@ -179,13 +179,13 @@ class SimpleStatusPage extends BaseWebServer {
                 <a href="${this.getSecureUrl('/')}" class="secure-link btn">← Back to Status</a>
             </div>
         `;
-    }
+  }
     
-    /**
+  /**
      * Custom styles for status page
      */
-    getStatusStyles() {
-        return `
+  getStatusStyles() {
+    return `
             .status-grid {
                 display: grid;
                 grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -265,7 +265,7 @@ class SimpleStatusPage extends BaseWebServer {
                 margin-bottom: 8px;
             }
         `;
-    }
+  }
 }
 
 module.exports = SimpleStatusPage;

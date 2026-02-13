@@ -105,7 +105,7 @@ async function testMCPServerDirectly() {
   
   try {
     // Test MCP Server can be imported and instantiated
-    const TelegramMCPServer = require('./telegram-mcp-server.js');
+    require('./telegram-mcp-server.js');
     console.log('✅ MCP Server module imported successfully');
     
     // Test command line parsing

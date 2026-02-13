@@ -245,7 +245,7 @@ describe('Real Bot Integration - /start Command', () => {
               try {
                 const response = await testHelper.sendMessageAndWaitForResponse(command, 4000);
                 results.push({ command, handled: !!response });
-              } catch (error) {
+              } catch {
                 results.push({ command, handled: false, timeout: true });
               }
             }

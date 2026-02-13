@@ -348,7 +348,7 @@ class TelegramFormatter {
    * Format execution result (returns Markdown text)
    */
   formatExecutionResult(result, sessionId = null) {
-    const { success, cost, duration, usage, sessionDuration } = result;
+    const { success, cost, usage, sessionDuration } = result;
     
     const sessionIdText = sessionId ? sessionId.slice(-8) : 'unknown';
     let text = `${success ? '✅' : '❌'} ${success ? `**Session** \`${sessionIdText}\` **ended** #session_ended` : '**Execution Failed**'}\n\n`;

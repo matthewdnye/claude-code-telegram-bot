@@ -1,7 +1,4 @@
 const FileHandler = require('../../FileHandler');
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
 
 describe('FileHandler', () => {
   let fileHandler;

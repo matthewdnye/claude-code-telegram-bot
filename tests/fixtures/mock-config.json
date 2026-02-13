@@ -1,0 +1,8 @@
+{
+  "activityWatch": {
+    "integration": {
+      "fakeAppName": "test-app",
+      "sessionTitleTemplate": "Test Session"
+    }
+  }
+}

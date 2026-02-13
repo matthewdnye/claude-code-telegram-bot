@@ -32,6 +32,11 @@ module.exports = {
   // Test timeout
   testTimeout: 30000,
   
+  // Module name mapping for mocked configs
+  moduleNameMapper: {
+    '^.*/config\\.json$': '<rootDir>/tests/fixtures/mock-config.json'
+  },
+
   // Module paths
   moduleFileExtensions: ['js', 'json'],
   

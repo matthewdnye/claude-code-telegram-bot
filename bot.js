@@ -2240,7 +2240,7 @@ class StreamTelegramBot {
       }
 
       console.log('Starting unified web server...');
-      const url = await this.unifiedWebServer.start();
+      await this.unifiedWebServer.start();
       
       // Get secure URL with token for external access
       this.webServerUrl = this.unifiedWebServer.getSecurePublicUrl();
@@ -2280,18 +2280,6 @@ class StreamTelegramBot {
       // Start unified web server if not already running
       await this.startUnifiedWebServer();
       const secureUrl = this.unifiedWebServer.getSecurePublicUrl() || this.webServerUrl;
-      
-      // Check if using local access (LocalTunnel failed) 
-      const isLocalOnly = secureUrl && secureUrl.includes('localhost');
-      const accessType = isLocalOnly ? '🏠 Local Access Only' : '🌐 Public Access Available';
-      const statusIcon = isLocalOnly ? '🏠' : '🌐';
-      const buttonText = isLocalOnly ? '🏠 Open Locally' : '🌐 Open File Browser';
-      
-      // secureUrl already contains the security token from startUnifiedWebServer
-      
-      const ngrokTip = isLocalOnly ? 
-        '🔧 **Setup Remote Access:** Set NGROK_AUTHTOKEN environment variable' : 
-        '💡 **Tip:** Add header `ngrok-skip-browser-warning: true` to bypass ngrok warning banner';
       
       const message = '🌐 **Web App Available**\n\n' +
         `🔗 Access URL:\n${secureUrl}`;
@@ -2336,22 +2324,19 @@ class StreamTelegramBot {
         );
         break;
 
-      case 'start':
+      case 'start': {
         await this.startUnifiedWebServer();
         const secureUrl = this.unifiedWebServer.getSecurePublicUrl() || this.webServerUrl;
-        const isUrlLocalOnly = secureUrl && secureUrl.includes('localhost');
-        const accessType = isUrlLocalOnly ? '🏠 Local Access Only' : '🌐 Public Access Available';
-        const statusIcon = isUrlLocalOnly ? '🏠' : '🌐';
-          
+
         const message = '🌐 **Web App Available**\n\n' +
             `🔗 Access URL:\n${secureUrl}`;
-          
+
         const replyMarkup = {
           inline_keyboard: [
             [{ text: '🌐 Open Web App', web_app: { url: secureUrl } }]
           ]
         };
-            
+
         await this.bot.editMessageText(message, {
           chat_id: chatId,
           message_id: query.message.message_id,
@@ -2359,13 +2344,11 @@ class StreamTelegramBot {
           reply_markup: replyMarkup
         });
         break;
+      }
 
       case 'refresh':
         if (this.webServerUrl) {
           const secureRefreshUrl = this.unifiedWebServer.getSecurePublicUrl() || this.webServerUrl;
-          const isRefreshLocalOnly = this.webServerUrl.includes('localhost');
-          const refreshAccessType = isRefreshLocalOnly ? '🏠 Local Access Only' : '🌐 Public Access Available';
-          const refreshStatusIcon = isRefreshLocalOnly ? '🏠' : '🌐';
             
           const refreshMessage = '🌐 **Web App Available**\n\n' +
               `🔗 Access URL:\n${secureRefreshUrl}`;

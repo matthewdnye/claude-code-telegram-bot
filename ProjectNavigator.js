@@ -277,7 +277,7 @@ class ProjectNavigator {
         fs.mkdirSync(projectsHomeDir, { recursive: true });
       } catch (error) {
         await this.mainBot.safeEditMessage(chatId, messageId, 
-          `❌ **Cannot Create Projects Directory**\n\n` +
+          '❌ **Cannot Create Projects Directory**\n\n' +
           `**Path:** \`${projectsHomeDir}\`\n` +
           `**Error:** ${error.message}\n\n` +
           'Please check the path and permissions.',
@@ -503,7 +503,7 @@ class ProjectNavigator {
     fs.writeFileSync(path.join(projectPath, 'README.md'), readmeContent, 'utf8');
 
     // Create basic .gitignore
-    const gitignoreContent = `# Dependencies\nnode_modules/\n\n# Logs\nlogs\n*.log\nnpm-debug.log*\nyarn-debug.log*\nyarn-error.log*\n\n# Environment variables\n.env\n.env.local\n.env.development.local\n.env.test.local\n.env.production.local\n\n# IDE\n.vscode/\n.idea/\n*.swp\n*.swo\n*~\n\n# OS\n.DS_Store\nThumbs.db\n\n# Build output\ndist/\nbuild/\n\n# Claude Code temporary files\n.claude-temp/\n`;
+    const gitignoreContent = '# Dependencies\nnode_modules/\n\n# Logs\nlogs\n*.log\nnpm-debug.log*\nyarn-debug.log*\nyarn-error.log*\n\n# Environment variables\n.env\n.env.local\n.env.development.local\n.env.test.local\n.env.production.local\n\n# IDE\n.vscode/\n.idea/\n*.swp\n*.swo\n*~\n\n# OS\n.DS_Store\nThumbs.db\n\n# Build output\ndist/\nbuild/\n\n# Claude Code temporary files\n.claude-temp/\n';
 
     fs.writeFileSync(path.join(projectPath, '.gitignore'), gitignoreContent, 'utf8');
 
@@ -564,8 +564,8 @@ class ProjectNavigator {
         this.mainBot.configManager.setCurrentProject(projectPath);
         
         // Ensure projectSessions exists - ConfigManager handles this automatically
-        const projectSessions = this.mainBot.configManager.getProjectSessions();
-        
+        this.mainBot.configManager.getProjectSessions();
+
         // Note: We don't create a session here, just set the current project
         // Sessions will be created/updated when the user actually starts using the project
         
