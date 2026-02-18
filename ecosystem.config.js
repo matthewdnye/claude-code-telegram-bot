@@ -6,6 +6,7 @@ module.exports = {
       script: 'scripts/start-bot.js',
       args: 'gwen',
       cwd: '/Users/matthewdnye/Developer/claude-code-telegram-bot',
+      filter_env: ['CLAUDECODE', 'CLAUDE_CODE_SSE_PORT', 'CLAUDE_CONFIG_DIR', 'CLAUDE_CODE_ENTRYPOINT', 'GIT_EDITOR'],
       env: {
         NODE_ENV: 'production',
         NGROK_AUTHTOKEN: process.env.NGROK_AUTHTOKEN
@@ -29,6 +30,7 @@ module.exports = {
       script: 'scripts/start-bot.js',
       args: 'matt',
       cwd: '/Users/matthewdnye/Developer/claude-code-telegram-bot',
+      filter_env: ['CLAUDECODE', 'CLAUDE_CODE_SSE_PORT', 'CLAUDE_CONFIG_DIR', 'CLAUDE_CODE_ENTRYPOINT', 'GIT_EDITOR'],
       env: {
         NODE_ENV: 'production',
         NGROK_AUTHTOKEN: process.env.NGROK_AUTHTOKEN
